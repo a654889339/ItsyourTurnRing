@@ -18,6 +18,10 @@ services:
       - SQLITE_PATH=/app/data/ring.db
       - JWT_SECRET=ring_jwt_secret_key_2024_very_secure
       - LOG_LEVEL=info
+      - COS_SECRET_ID=${COS_SECRET_ID:-}
+      - COS_SECRET_KEY=${COS_SECRET_KEY:-}
+      - COS_BUCKET=${COS_BUCKET:-itsyourturnmy-1256887166}
+      - COS_REGION=${COS_REGION:-ap-singapore}
     volumes:
       - ring_data:/app/data
       - ring_uploads:/app/uploads

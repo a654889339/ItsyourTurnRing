@@ -224,6 +224,18 @@ func applyEnvOverrides(config *Config) {
 	if secretKey := os.Getenv("COS_SECRET_KEY"); secretKey != "" {
 		config.TencentCloud.COS.SecretKey = secretKey
 	}
+	if bucket := os.Getenv("COS_BUCKET"); bucket != "" {
+		config.TencentCloud.COS.Bucket = bucket
+	}
+	if region := os.Getenv("COS_REGION"); region != "" {
+		config.TencentCloud.COS.Region = region
+	}
+	if config.TencentCloud.COS.Bucket != "" && config.TencentCloud.COS.Region != "" {
+		config.TencentCloud.COS.BaseURL = "https://" + config.TencentCloud.COS.Bucket + ".cos." + config.TencentCloud.COS.Region + ".myqcloud.com"
+	}
+	if config.TencentCloud.COS.SecretID != "" && config.TencentCloud.COS.SecretKey != "" && config.TencentCloud.COS.Bucket != "" {
+		config.TencentCloud.COS.Enabled = true
+	}
 	if username := os.Getenv("EMAIL_USERNAME"); username != "" {
 		config.Email.Username = username
 	}

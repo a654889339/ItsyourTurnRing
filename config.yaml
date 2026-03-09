@@ -44,14 +44,14 @@ domain:
 # 腾讯云配置
 # ===============================
 tencent_cloud:
-  # COS对象存储
+  # COS对象存储 (与ItsyourTurnMy同桶，ring/目录下隔离)
   cos:
-    enabled: false
+    enabled: true
     secret_id: ${COS_SECRET_ID:}
     secret_key: ${COS_SECRET_KEY:}
-    bucket: ring-images-1234567890           # 不同于ItsyourTurnMy的bucket
-    region: ap-guangzhou
-    base_url: https://ring-images-1234567890.cos.ap-guangzhou.myqcloud.com
+    bucket: ${COS_BUCKET:itsyourturnmy-1256887166}
+    region: ${COS_REGION:ap-singapore}
+    base_url: https://${COS_BUCKET:itsyourturnmy-1256887166}.cos.${COS_REGION:ap-singapore}.myqcloud.com
 
   # 云短信SMS
   sms:
