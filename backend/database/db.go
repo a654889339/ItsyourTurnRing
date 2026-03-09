@@ -240,6 +240,7 @@ func createTables() error {
 		`CREATE TABLE IF NOT EXISTS qr_codes (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name VARCHAR(100) NOT NULL,
+			scene VARCHAR(30) DEFAULT 'custom',
 			platform VARCHAR(20) NOT NULL,
 			page VARCHAR(200) NOT NULL,
 			params TEXT,
@@ -279,6 +280,9 @@ func createTables() error {
 			return fmt.Errorf("create table failed: %v", err)
 		}
 	}
+
+	// 兼容升级: 为旧的 qr_codes 表添加 scene 列
+	DB.Exec("ALTER TABLE qr_codes ADD COLUMN scene VARCHAR(30) DEFAULT 'custom'")
 
 	// 初始化默认分类
 	initDefaultCategories()

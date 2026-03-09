@@ -189,21 +189,25 @@ type VerificationCode struct {
 type QRCode struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
+	Scene     string    `json:"scene"`     // product_view / product_buy / order_status / home / custom
 	Platform  string    `json:"platform"`  // wechat / alipay
 	Page      string    `json:"page"`
 	Params    string    `json:"params"`
 	ImageURL  string    `json:"image_url"`
-	Content   string    `json:"content"`   // 二维码编码内容
+	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // QRCodeCreateRequest 创建二维码请求
 type QRCodeCreateRequest struct {
-	Name     string `json:"name"`
-	Platform string `json:"platform"`
-	Page     string `json:"page"`
-	Params   string `json:"params"`
+	Name      string `json:"name"`
+	Scene     string `json:"scene"`
+	Platform  string `json:"platform"`
+	Page      string `json:"page"`
+	Params    string `json:"params"`
+	ProductID int64  `json:"product_id"`
+	OrderNo   string `json:"order_no"`
 }
 
 // ProductChangeLog 商品变更日志
