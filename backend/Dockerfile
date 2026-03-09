@@ -1,38 +1,43 @@
-FROM golang:1.21-alpine AS builder
+# 构建阶段 - 使用 Debian-based 镜像避免 musl 兼容性问题
+FROM golang:1.21-bookworm AS builder
 
 WORKDIR /app
 
-# 安装依赖
-RUN apk add --no-cache gcc musl-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libc6-dev libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件
-COPY go.mod go.sum ./
-RUN go mod download
+ENV GOPROXY=https://goproxy.cn,direct
 
-# 复制源码
+COPY go.mod ./
 COPY . .
 
-# 编译
-RUN CGO_ENABLED=1 GOOS=linux go build -o main .
+RUN go mod tidy
+RUN CGO_ENABLED=1 GOOS=linux go build -o ring-server .
 
 # 运行阶段
-FROM alpine:latest
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tzdata libsqlite3-0 wget \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=Asia/Shanghai
+
+RUN groupadd -g 1000 ring && \
+    useradd -u 1000 -g ring -s /bin/sh -m ring
 
 WORKDIR /app
 
-# 安装必要的库
-RUN apk add --no-cache ca-certificates tzdata sqlite-libs wget
+COPY --from=builder /app/ring-server .
 
-# 复制编译好的二进制
-COPY --from=builder /app/main .
+RUN mkdir -p /app/data /app/uploads && chown -R ring:ring /app
 
-# 创建数据和上传目录
-RUN mkdir -p data uploads
+USER ring
 
 EXPOSE 5102
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:5102/health || exit 1
 
-CMD ["./main"]
+ENTRYPOINT ["./ring-server"]

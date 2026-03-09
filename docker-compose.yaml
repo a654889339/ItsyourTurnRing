@@ -1,0 +1,56 @@
+# Docker Compose 配置 - ItsyourTurnRing 前后端部署
+# 端口与 ItsyourTurnMy(5001/5002/9090) 区分
+version: '3.8'
+
+services:
+  ring-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ring-backend
+    restart: unless-stopped
+    ports:
+      - "5102:5102"
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - BACKEND_PORT=5102
+      - DB_DRIVER=sqlite
+      - SQLITE_PATH=/app/data/ring.db
+      - JWT_SECRET=ring_jwt_secret_key_2024_very_secure
+      - LOG_LEVEL=info
+    volumes:
+      - ring_data:/app/data
+      - ring_uploads:/app/uploads
+      - ./config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5102/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ring-network
+
+  ring-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ring-frontend
+    restart: unless-stopped
+    ports:
+      - "5101:5101"
+    depends_on:
+      ring-backend:
+        condition: service_healthy
+    networks:
+      - ring-network
+
+volumes:
+  ring_data:
+    driver: local
+  ring_uploads:
+    driver: local
+
+networks:
+  ring-network:
+    driver: bridge
