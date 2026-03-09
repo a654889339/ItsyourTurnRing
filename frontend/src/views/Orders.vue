@@ -45,13 +45,14 @@
             </td>
             <td>
               <div class="order-items">
-                <div v-for="item in order.items?.slice(0, 2)" :key="item.id" class="order-item">
+                <div v-for="item in order.items" :key="item.id" class="order-item">
                   <img :src="item.product_image || '/placeholder.png'" class="item-image" />
                   <span class="item-name">{{ item.product_name }}</span>
-                  <span class="item-qty">x{{ item.quantity }}</span>
-                </div>
-                <div v-if="order.items?.length > 2" class="more-items">
-                  等{{ order.items.length }}件商品
+                  <div class="inline-qty">
+                    <button class="inline-qty-btn" @click.stop="changeItemQtyInline(order, item, -1)" :disabled="item._saving">−</button>
+                    <span class="inline-qty-val">{{ item.quantity }}</span>
+                    <button class="inline-qty-btn" @click.stop="changeItemQtyInline(order, item, 1)" :disabled="item._saving">+</button>
+                  </div>
                 </div>
               </div>
             </td>
@@ -538,6 +539,31 @@ const changeItemQty = async (item, delta) => {
   }
 }
 
+// 列表页内联修改数量
+const changeItemQtyInline = async (order, item, delta) => {
+  const newQty = item.quantity + delta
+  if (newQty < 0) return
+  if (newQty === 0 && !confirm(`确认删除「${item.product_name}」？`)) return
+
+  item._saving = true
+  try {
+    await orderAPI.updateItemQuantity(order.id, item.id, newQty)
+    if (newQty === 0) {
+      const idx = order.items.findIndex(i => i.id === item.id)
+      if (idx >= 0) order.items.splice(idx, 1)
+    } else {
+      item.quantity = newQty
+    }
+    const newTotal = order.items.reduce((s, i) => s + i.price * i.quantity, 0)
+    order.pay_price = newTotal
+    order.total_price = newTotal
+  } catch (err) {
+    alert('修改失败: ' + err.message)
+  } finally {
+    item._saving = false
+  }
+}
+
 // ---- 历史记录 ----
 const getLogIcon = (type) => {
   const icons = { status: '🔄', price: '💰', remark: '📝', quantity: '📦' }
@@ -600,7 +626,16 @@ onMounted(() => {
 .order-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .item-image { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
 .item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.item-qty { font-size: 12px; color: var(--text-secondary); }
+.inline-qty { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.inline-qty-btn {
+  width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 3px;
+  background: #fff; cursor: pointer; font-size: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; color: #666;
+  padding: 0; transition: all 0.15s;
+}
+.inline-qty-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.inline-qty-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.inline-qty-val { font-size: 12px; min-width: 18px; text-align: center; font-weight: 600; color: var(--text-secondary); }
 .more-items { font-size: 12px; color: var(--text-secondary); }
 .contact { font-size: 12px; color: var(--text-secondary); }
 
