@@ -75,7 +75,10 @@ func setupRoutes(mux *http.ServeMux) {
 	// 认证路由 (无需登录)
 	mux.HandleFunc("/api/v1/auth/register", handleRegister)
 	mux.HandleFunc("/api/v1/auth/login", handleLogin)
+	mux.HandleFunc("/api/v1/auth/wechat-login", handleWechatLogin)
+	mux.HandleFunc("/api/v1/auth/alipay-login", handleAlipayLogin)
 	mux.HandleFunc("/api/v1/auth/me", authMiddleware(handleGetCurrentUser))
+	mux.HandleFunc("/api/v1/auth/update-profile", authMiddleware(handleUpdateProfile))
 
 	// 公开API (无需登录)
 	mux.HandleFunc("/api/v1/public/products", handlePublicProducts)
@@ -258,6 +261,68 @@ func handleGetCurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jsonResponse(w, user)
+}
+
+func handleWechatLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" {
+		jsonError(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	result, err := authService.WechatLogin(req.Code)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+func handleAlipayLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" {
+		jsonError(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	result, err := authService.AlipayLogin(req.Code)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID := getUserID(r)
+	var req struct {
+		Nickname string `json:"nickname"`
+		Avatar   string `json:"avatar"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	user, err := authService.UpdateProfile(userID, req.Nickname, req.Avatar)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	jsonResponse(w, user)
 }
 

@@ -6,14 +6,19 @@ App({
   },
 
   onLaunch() {
-    // 从缓存读取token
     const token = wx.getStorageSync('token')
+    const userInfo = wx.getStorageSync('userInfo')
     if (token) {
       this.globalData.token = token
     }
+    if (userInfo) {
+      this.globalData.userInfo = userInfo
+    }
+    if (!token) {
+      this.wxLogin()
+    }
   },
 
-  // API请求封装
   request(options) {
     const { url, method = 'GET', data, showLoading = true } = options
 
@@ -36,9 +41,10 @@ App({
           if (res.data.code === 0) {
             resolve(res.data.data)
           } else if (res.statusCode === 401) {
-            // 登录过期
             this.globalData.token = null
+            this.globalData.userInfo = null
             wx.removeStorageSync('token')
+            wx.removeStorageSync('userInfo')
             wx.showToast({ title: '请先登录', icon: 'none' })
             reject(new Error('未登录'))
           } else {
@@ -55,46 +61,62 @@ App({
     })
   },
 
-  // 设置登录token
   setToken(token) {
     this.globalData.token = token
     wx.setStorageSync('token', token)
   },
 
-  // 登出
+  setUserInfo(user) {
+    this.globalData.userInfo = user
+    wx.setStorageSync('userInfo', user)
+  },
+
   logout() {
     this.globalData.token = null
     this.globalData.userInfo = null
     wx.removeStorageSync('token')
+    wx.removeStorageSync('userInfo')
   },
 
-  // 检查登录状态
   checkLogin() {
     return !!this.globalData.token
   },
 
-  // 微信登录
   wxLogin() {
     return new Promise((resolve, reject) => {
       wx.login({
         success: (res) => {
           if (res.code) {
-            // 发送code到后端换取token
             this.request({
               url: '/auth/wechat-login',
               method: 'POST',
-              data: { code: res.code }
+              data: { code: res.code },
+              showLoading: false
             }).then(data => {
               this.setToken(data.token)
-              this.globalData.userInfo = data.user
+              this.setUserInfo(data.user)
               resolve(data)
-            }).catch(reject)
+            }).catch(err => {
+              console.error('微信登录失败', err)
+              reject(err)
+            })
           } else {
-            reject(new Error('登录失败'))
+            reject(new Error('获取code失败'))
           }
         },
         fail: reject
       })
+    })
+  },
+
+  updateProfile(nickname, avatarUrl) {
+    return this.request({
+      url: '/auth/update-profile',
+      method: 'POST',
+      data: { nickname, avatar: avatarUrl }
+    }).then(user => {
+      this.setUserInfo(user)
+      return user
     })
   }
 })

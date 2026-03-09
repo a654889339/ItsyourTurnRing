@@ -1,8 +1,24 @@
 <view class="page-user">
   <view class="user-header">
     <view class="user-info" a:if="{{isLogin}}">
-      <view class="user-avatar">{{userInfo.username ? userInfo.username[0] : 'U'}}</view>
-      <view class="user-name">{{userInfo.username || '用户'}}</view>
+      <!-- 头像：点击选择新头像 -->
+      <view class="avatar-wrap" onTap="onChooseAvatar">
+        <image a:if="{{avatarUrl}}" src="{{avatarUrl}}" class="user-avatar-img" mode="aspectFill" />
+        <view a:else class="user-avatar">
+          <text>{{userInitial}}</text>
+        </view>
+        <view class="avatar-edit-hint">换头像</view>
+      </view>
+      <view class="user-detail">
+        <input
+          class="nickname-input"
+          value="{{nickname}}"
+          placeholder="点击设置昵称"
+          onBlur="onNicknameBlur"
+          onInput="onNicknameInput"
+        />
+        <view class="user-id">ID: {{userInfo.id}}</view>
+      </view>
     </view>
     <view class="not-login" a:else onTap="onLogin">
       <view class="user-avatar">?</view>

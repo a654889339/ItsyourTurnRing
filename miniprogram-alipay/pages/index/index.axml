@@ -1,5 +1,18 @@
 <!-- 首页 -->
 <view class="page-index">
+  <!-- 顶部用户栏 -->
+  <view class="top-bar">
+    <view class="top-bar-left">
+      <text class="shop-name">RingShop</text>
+    </view>
+    <navigator url="/pages/user/index" class="top-bar-avatar">
+      <image a:if="{{userAvatar}}" src="{{userAvatar}}" class="avatar-img" mode="aspectFill" />
+      <view a:else class="avatar-placeholder">
+        <text>{{userInitial}}</text>
+      </view>
+    </navigator>
+  </view>
+
   <!-- 轮播图 -->
   <swiper class="banner-swiper" indicator-dots="{{true}}" autoplay="{{true}}" circular="{{true}}" a:if="{{banners.length > 0}}">
     <swiper-item a:for="{{banners}}" a:key="id">

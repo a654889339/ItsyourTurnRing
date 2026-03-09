@@ -3,8 +3,26 @@
   <!-- 用户信息 -->
   <view class="user-header">
     <view class="user-info" wx:if="{{isLogin}}">
-      <view class="user-avatar">{{userInfo.username ? userInfo.username[0] : 'U'}}</view>
-      <view class="user-name">{{userInfo.username || '用户'}}</view>
+      <!-- 头像：点击选择新头像 -->
+      <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image wx:if="{{avatarUrl}}" src="{{avatarUrl}}" class="user-avatar-img" mode="aspectFill" />
+        <view wx:else class="user-avatar">
+          <text>{{userInitial}}</text>
+        </view>
+      </button>
+      <view class="user-detail">
+        <view class="nickname-row">
+          <input
+            type="nickname"
+            class="nickname-input"
+            value="{{nickname}}"
+            placeholder="点击设置昵称"
+            bindblur="onNicknameBlur"
+            bindinput="onNicknameInput"
+          />
+        </view>
+        <view class="user-id">ID: {{userInfo.id}}</view>
+      </view>
     </view>
     <view class="not-login" wx:else bindtap="onLogin">
       <view class="user-avatar">?</view>
@@ -14,21 +32,9 @@
 
   <!-- 菜单列表 -->
   <view class="menu-list">
-    <navigator url="/pages/order/index" class="menu-item">
+    <navigator url="/pages/order/index" class="menu-item" open-type="switchTab">
       <text class="menu-icon">📦</text>
       <text class="menu-text">我的订单</text>
-      <text class="menu-arrow">›</text>
-    </navigator>
-
-    <navigator url="/pages/address/index" class="menu-item">
-      <text class="menu-icon">📍</text>
-      <text class="menu-text">收货地址</text>
-      <text class="menu-arrow">›</text>
-    </navigator>
-
-    <navigator url="/pages/favorite/index" class="menu-item">
-      <text class="menu-icon">❤️</text>
-      <text class="menu-text">我的收藏</text>
       <text class="menu-arrow">›</text>
     </navigator>
 

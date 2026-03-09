@@ -10,12 +10,32 @@ Page({
     currentCategory: '',
     page: 1,
     hasMore: true,
-    loading: false
+    loading: false,
+    userAvatar: '',
+    userInitial: ''
   },
 
   onLoad() {
     this.loadHomeData()
     this.loadProducts()
+  },
+
+  onShow() {
+    this.refreshUserInfo()
+  },
+
+  refreshUserInfo() {
+    const userInfo = app.globalData.userInfo
+    if (userInfo) {
+      const avatar = (userInfo.avatar && userInfo.avatar !== '') ? userInfo.avatar : ''
+      const nickname = userInfo.nickname || userInfo.username || ''
+      this.setData({
+        userAvatar: avatar,
+        userInitial: nickname ? nickname[0].toUpperCase() : 'U'
+      })
+    } else {
+      this.setData({ userAvatar: '', userInitial: '' })
+    }
   },
 
   onPullDownRefresh() {

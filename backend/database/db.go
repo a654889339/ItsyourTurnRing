@@ -296,6 +296,9 @@ func createTables() error {
 	// 兼容升级
 	DB.Exec("ALTER TABLE qr_codes ADD COLUMN scene VARCHAR(30) DEFAULT 'custom'")
 	DB.Exec("ALTER TABLE products ADD COLUMN video VARCHAR(500) DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN nickname VARCHAR(100) DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN wechat_openid VARCHAR(100) DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN alipay_userid VARCHAR(100) DEFAULT ''")
 
 	// 初始化默认分类
 	initDefaultCategories()

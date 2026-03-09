@@ -16,6 +16,29 @@
   align-items: center;
 }
 
+.avatar-btn {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  line-height: 1;
+  width: 120rpx;
+  height: 120rpx;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.avatar-btn::after {
+  display: none;
+}
+
+.user-avatar-img {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255, 255, 255, 0.6);
+}
+
 .user-avatar {
   width: 120rpx;
   height: 120rpx;
@@ -27,6 +50,36 @@
   font-size: 48rpx;
   color: #fff;
   font-weight: bold;
+}
+
+.user-detail {
+  margin-left: 30rpx;
+  flex: 1;
+}
+
+.nickname-row {
+  display: flex;
+  align-items: center;
+}
+
+.nickname-input {
+  font-size: 34rpx;
+  color: #fff;
+  font-weight: 500;
+  width: 100%;
+  background: transparent;
+  border-bottom: 2rpx solid rgba(255, 255, 255, 0.3);
+  padding-bottom: 8rpx;
+}
+
+.nickname-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.user-id {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 10rpx;
 }
 
 .user-name {

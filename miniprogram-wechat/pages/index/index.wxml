@@ -1,5 +1,18 @@
 <!-- 首页 -->
 <view class="page-index">
+  <!-- 顶部用户栏 -->
+  <view class="top-bar">
+    <view class="top-bar-left">
+      <text class="shop-name">RingShop</text>
+    </view>
+    <navigator url="/pages/user/index" open-type="switchTab" class="top-bar-avatar">
+      <image wx:if="{{userAvatar}}" src="{{userAvatar}}" class="avatar-img" mode="aspectFill" />
+      <view wx:else class="avatar-placeholder">
+        <text>{{userInitial}}</text>
+      </view>
+    </navigator>
+  </view>
+
   <!-- 轮播图 -->
   <swiper class="banner-swiper" indicator-dots autoplay circular wx:if="{{banners.length > 0}}">
     <swiper-item wx:for="{{banners}}" wx:key="id" bindtap="onBannerTap" data-banner="{{item}}">

@@ -7,15 +7,18 @@ import (
 
 // User 用户模型
 type User struct {
-	ID        int64          `json:"id"`
-	Username  string         `json:"username"`
-	Password  string         `json:"-"`
-	Email     sql.NullString `json:"email"`
-	Phone     sql.NullString `json:"phone"`
-	Avatar    sql.NullString `json:"avatar"`
-	Role      string         `json:"role"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ID            int64          `json:"id"`
+	Username      string         `json:"username"`
+	Password      string         `json:"-"`
+	Nickname      string         `json:"nickname"`
+	Email         sql.NullString `json:"email"`
+	Phone         sql.NullString `json:"phone"`
+	Avatar        sql.NullString `json:"avatar"`
+	Role          string         `json:"role"`
+	WechatOpenID  string         `json:"wechat_openid,omitempty"`
+	AlipayUserID  string         `json:"alipay_userid,omitempty"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // Category 商品分类模型
