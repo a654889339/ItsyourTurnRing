@@ -223,6 +223,17 @@ type ProductChangeLog struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// OrderChangeLog 订单变更日志
+type OrderChangeLog struct {
+	ID         int64     `json:"id"`
+	OrderID    int64     `json:"order_id"`
+	ChangeType string    `json:"change_type"` // status/price/remark
+	OldValue   string    `json:"old_value"`
+	NewValue   string    `json:"new_value"`
+	Operator   string    `json:"operator"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 // SalesReport 销售报表
 type SalesReport struct {
 	ID            int64     `json:"id"`

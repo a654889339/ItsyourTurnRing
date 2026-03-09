@@ -76,15 +76,24 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">省</label>
-              <input v-model="address.province" type="text" class="form-input" placeholder="省份" />
+              <select v-model="address.province" class="form-input form-select" @change="onProvinceChange">
+                <option value="">请选择省份</option>
+                <option v-for="p in provinceList" :key="p" :value="p">{{ p }}</option>
+              </select>
             </div>
             <div class="form-group">
               <label class="form-label">市</label>
-              <input v-model="address.city" type="text" class="form-input" placeholder="城市" />
+              <select v-model="address.city" class="form-input form-select" @change="onCityChange">
+                <option value="">请选择城市</option>
+                <option v-for="c in cityList" :key="c" :value="c">{{ c }}</option>
+              </select>
             </div>
             <div class="form-group">
               <label class="form-label">区</label>
-              <input v-model="address.district" type="text" class="form-input" placeholder="区县" />
+              <select v-model="address.district" class="form-input form-select">
+                <option value="">请选择区县</option>
+                <option v-for="d in districtList" :key="d" :value="d">{{ d }}</option>
+              </select>
             </div>
           </div>
           <div class="form-group">
@@ -116,6 +125,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { productAPI, orderAPI } from '../api'
+import regions from '../data/regions'
 
 const router = useRouter()
 const allProducts = ref([])
@@ -128,6 +138,26 @@ const remark = ref('')
 const address = reactive({
   name: '', phone: '', province: '', city: '', district: '', detail: ''
 })
+
+const provinceList = computed(() => Object.keys(regions))
+const cityList = computed(() => {
+  if (!address.province || !regions[address.province]) return []
+  return Object.keys(regions[address.province])
+})
+const districtList = computed(() => {
+  if (!address.province || !address.city) return []
+  const cities = regions[address.province]
+  if (!cities || !cities[address.city]) return []
+  return cities[address.city]
+})
+
+function onProvinceChange() {
+  address.city = ''
+  address.district = ''
+}
+function onCityChange() {
+  address.district = ''
+}
 
 const totalPrice = computed(() => cart.value.reduce((sum, i) => sum + i.price * i.quantity, 0))
 
@@ -268,6 +298,18 @@ onMounted(loadProducts)
 /* Form */
 .form-row { display: flex; gap: 12px; margin-bottom: 12px; }
 .form-row .form-group { flex: 1; margin-bottom: 0; }
+
+/* Select */
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+.form-select:focus { border-color: var(--primary-color); }
 
 /* Submit */
 .btn-submit { width: 100%; padding: 14px; font-size: 16px; border-radius: 8px; }

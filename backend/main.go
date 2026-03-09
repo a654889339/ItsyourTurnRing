@@ -648,11 +648,53 @@ func handleOrderByID(w http.ResponseWriter, r *http.Request) {
 					jsonError(w, "Invalid request", http.StatusBadRequest)
 					return
 				}
-				if err := orderService.UpdateOrderStatus(orderID, userID, &req); err != nil {
+				if err := orderService.AdminUpdateOrderStatus(orderID, &req); err != nil {
 					jsonError(w, err.Error(), http.StatusBadRequest)
 					return
 				}
 				jsonResponse(w, nil)
+				return
+			}
+		case "price":
+			if r.Method == "PUT" {
+				var req struct {
+					Price float64 `json:"price"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					jsonError(w, "Invalid request", http.StatusBadRequest)
+					return
+				}
+				if err := orderService.AdminUpdatePrice(orderID, req.Price); err != nil {
+					jsonError(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				jsonResponse(w, nil)
+				return
+			}
+		case "remark":
+			if r.Method == "PUT" {
+				var req struct {
+					Remark string `json:"remark"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					jsonError(w, "Invalid request", http.StatusBadRequest)
+					return
+				}
+				if err := orderService.AdminAppendRemark(orderID, req.Remark); err != nil {
+					jsonError(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				jsonResponse(w, nil)
+				return
+			}
+		case "logs":
+			if r.Method == "GET" {
+				logs, err := orderService.GetOrderChangeLogs(orderID)
+				if err != nil {
+					jsonError(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				jsonResponse(w, logs)
 				return
 			}
 		}

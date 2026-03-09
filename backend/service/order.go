@@ -592,9 +592,14 @@ func (s *OrderService) AdminListOrders(query *model.PageQuery, adminID int64) (*
 	}, nil
 }
 
-// AdminUpdateOrderStatus 管理员更新订单状态
+// AdminUpdateOrderStatus 管理员更新订单状态（带日志）
 func (s *OrderService) AdminUpdateOrderStatus(orderID int64, req *model.OrderUpdateStatusRequest) error {
 	db := database.GetDB()
+
+	var oldStatus string
+	if err := db.QueryRow("SELECT status FROM orders WHERE id = ?", orderID).Scan(&oldStatus); err != nil {
+		return errors.New("订单不存在")
+	}
 
 	updateSQL := "UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP"
 	args := []interface{}{req.Status}
@@ -602,13 +607,95 @@ func (s *OrderService) AdminUpdateOrderStatus(orderID int64, req *model.OrderUpd
 	if req.Status == "shipped" {
 		updateSQL += ", ship_time = CURRENT_TIMESTAMP, express_company = ?, express_no = ?"
 		args = append(args, req.ExpressCompany, req.ExpressNo)
+	} else if req.Status == "paid" {
+		updateSQL += ", pay_status = 'paid', pay_time = CURRENT_TIMESTAMP"
+	} else if req.Status == "received" || req.Status == "completed" {
+		updateSQL += ", receive_time = CURRENT_TIMESTAMP"
 	}
 
 	updateSQL += " WHERE id = ?"
 	args = append(args, orderID)
 
-	_, err := db.Exec(updateSQL, args...)
-	return err
+	if _, err := db.Exec(updateSQL, args...); err != nil {
+		return err
+	}
+
+	s.logChange(orderID, "status", oldStatus, req.Status, "admin")
+	return nil
+}
+
+// AdminUpdatePrice 管理员修改订单总价（带日志）
+func (s *OrderService) AdminUpdatePrice(orderID int64, newPrice float64) error {
+	db := database.GetDB()
+
+	var oldPrice float64
+	if err := db.QueryRow("SELECT pay_price FROM orders WHERE id = ?", orderID).Scan(&oldPrice); err != nil {
+		return errors.New("订单不存在")
+	}
+
+	_, err := db.Exec("UPDATE orders SET pay_price = ?, total_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		newPrice, newPrice, orderID)
+	if err != nil {
+		return err
+	}
+
+	s.logChange(orderID, "price",
+		fmt.Sprintf("%.2f", oldPrice),
+		fmt.Sprintf("%.2f", newPrice),
+		"admin")
+	return nil
+}
+
+// AdminAppendRemark 管理员追加订单备注（带日志）
+func (s *OrderService) AdminAppendRemark(orderID int64, newRemark string) error {
+	db := database.GetDB()
+
+	var oldRemark sql.NullString
+	if err := db.QueryRow("SELECT remark FROM orders WHERE id = ?", orderID).Scan(&oldRemark); err != nil {
+		return errors.New("订单不存在")
+	}
+
+	old := ""
+	if oldRemark.Valid {
+		old = oldRemark.String
+	}
+
+	_, err := db.Exec("UPDATE orders SET remark = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		newRemark, orderID)
+	if err != nil {
+		return err
+	}
+
+	s.logChange(orderID, "remark", old, newRemark, "admin")
+	return nil
+}
+
+// GetOrderChangeLogs 获取订单变更日志
+func (s *OrderService) GetOrderChangeLogs(orderID int64) ([]model.OrderChangeLog, error) {
+	db := database.GetDB()
+
+	rows, err := db.Query(`SELECT id, order_id, change_type, COALESCE(old_value,''), COALESCE(new_value,''), COALESCE(operator,''), created_at
+		FROM order_change_logs WHERE order_id = ? ORDER BY created_at DESC`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []model.OrderChangeLog
+	for rows.Next() {
+		var l model.OrderChangeLog
+		if err := rows.Scan(&l.ID, &l.OrderID, &l.ChangeType, &l.OldValue, &l.NewValue, &l.Operator, &l.CreatedAt); err != nil {
+			continue
+		}
+		logs = append(logs, l)
+	}
+	return logs, nil
+}
+
+func (s *OrderService) logChange(orderID int64, changeType, oldVal, newVal, operator string) {
+	db := database.GetDB()
+	db.Exec(`INSERT INTO order_change_logs (order_id, change_type, old_value, new_value, operator) VALUES (?, ?, ?, ?, ?)`,
+		orderID, changeType, oldVal, newVal, operator)
 }
 
 // CreateAdminOrder 管理员快速下单（不经购物车）

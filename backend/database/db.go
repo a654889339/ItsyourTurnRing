@@ -263,6 +263,18 @@ func createTables() error {
 			FOREIGN KEY (product_id) REFERENCES products(id)
 		)`,
 
+		// 订单变更日志
+		`CREATE TABLE IF NOT EXISTS order_change_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			order_id INTEGER NOT NULL,
+			change_type VARCHAR(20) NOT NULL,
+			old_value TEXT,
+			new_value TEXT,
+			operator VARCHAR(50),
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (order_id) REFERENCES orders(id)
+		)`,
+
 		// 销售报表快照
 		`CREATE TABLE IF NOT EXISTS sales_reports (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
