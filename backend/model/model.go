@@ -185,6 +185,27 @@ type VerificationCode struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// QRCode 小程序二维码
+type QRCode struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Platform  string    `json:"platform"`  // wechat / alipay
+	Page      string    `json:"page"`
+	Params    string    `json:"params"`
+	ImageURL  string    `json:"image_url"`
+	Content   string    `json:"content"`   // 二维码编码内容
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// QRCodeCreateRequest 创建二维码请求
+type QRCodeCreateRequest struct {
+	Name     string `json:"name"`
+	Platform string `json:"platform"`
+	Page     string `json:"page"`
+	Params   string `json:"params"`
+}
+
 // ProductChangeLog 商品变更日志
 type ProductChangeLog struct {
 	ID         int64     `json:"id"`

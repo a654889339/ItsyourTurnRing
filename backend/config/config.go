@@ -87,6 +87,7 @@ type EmailConfig struct {
 	Port     int    `yaml:"port"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+	From     string `yaml:"from"`
 	FromName string `yaml:"from_name"`
 }
 

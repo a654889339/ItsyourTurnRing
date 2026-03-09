@@ -37,6 +37,11 @@ const routes = [
         path: 'reports',
         name: 'Reports',
         component: () => import('../views/Reports.vue')
+      },
+      {
+        path: 'qrcodes',
+        name: 'QRCodes',
+        component: () => import('../views/QRCodes.vue')
       }
     ]
   },

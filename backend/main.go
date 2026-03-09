@@ -25,6 +25,7 @@ var (
 	bannerService   *service.BannerService
 	favoriteService *service.FavoriteService
 	reviewService   *service.ReviewService
+	qrcodeService   *service.QRCodeService
 )
 
 func main() {
@@ -63,6 +64,7 @@ func initServices() {
 	bannerService = service.NewBannerService()
 	favoriteService = service.NewFavoriteService()
 	reviewService = service.NewReviewService()
+	qrcodeService = service.NewQRCodeService()
 }
 
 func setupRoutes(mux *http.ServeMux) {
@@ -115,6 +117,11 @@ func setupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/reports/dashboard", authMiddleware(handleDashboard))
 	mux.HandleFunc("/api/v1/reports/sales", authMiddleware(handleSalesReport))
 	mux.HandleFunc("/api/v1/reports/products", authMiddleware(handleProductSalesRank))
+
+	// 二维码管理
+	mux.HandleFunc("/api/v1/qrcodes", authMiddleware(handleQRCodes))
+	mux.HandleFunc("/api/v1/qrcodes/", authMiddleware(handleQRCodeByID))
+	mux.HandleFunc("/api/v1/qrcodes/pages", authMiddleware(handleQRCodePages))
 
 	// 上传
 	mux.HandleFunc("/api/v1/upload/image", authMiddleware(handleUploadImage))
@@ -918,4 +925,84 @@ func parsePageQuery(r *http.Request) *model.PageQuery {
 		SortBy:   r.URL.Query().Get("sort_by"),
 		SortDir:  r.URL.Query().Get("sort_dir"),
 	}
+}
+
+// ============ 二维码处理器 ============
+
+func handleQRCodes(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		platform := r.URL.Query().Get("platform")
+		codes, err := qrcodeService.List(platform)
+		if err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		jsonResponse(w, codes)
+
+	case "POST":
+		var req model.QRCodeCreateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonError(w, "无效的请求", http.StatusBadRequest)
+			return
+		}
+		qr, err := qrcodeService.Create(&req)
+		if err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonResponse(w, qr)
+
+	default:
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleQRCodeByID(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/qrcodes/")
+	if path == "" || path == "pages" {
+		return
+	}
+	id, err := strconv.ParseInt(path, 10, 64)
+	if err != nil {
+		jsonError(w, "无效的ID", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case "GET":
+		qr, err := qrcodeService.GetByID(id)
+		if err != nil {
+			jsonError(w, "二维码不存在", http.StatusNotFound)
+			return
+		}
+		jsonResponse(w, qr)
+
+	case "DELETE":
+		if err := qrcodeService.Delete(id); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonResponse(w, nil)
+
+	default:
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleQRCodePages(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cfg := config.GetConfig()
+	pages := []map[string]string{
+		{"value": cfg.WechatMP.Pages.Home, "label": "首页"},
+		{"value": cfg.WechatMP.Pages.Product, "label": "商品详情"},
+		{"value": cfg.WechatMP.Pages.Cart, "label": "购物车"},
+		{"value": cfg.WechatMP.Pages.Order, "label": "订单列表"},
+		{"value": cfg.WechatMP.Pages.User, "label": "个人中心"},
+	}
+	jsonResponse(w, pages)
 }

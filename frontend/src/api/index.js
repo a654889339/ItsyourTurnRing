@@ -111,6 +111,15 @@ export const bannerAPI = {
   delete: (id) => api.delete(`/banners/${id}`)
 }
 
+// 二维码API
+export const qrcodeAPI = {
+  list: (params) => api.get('/qrcodes', { params }),
+  get: (id) => api.get(`/qrcodes/${id}`),
+  create: (data) => api.post('/qrcodes', data),
+  delete: (id) => api.delete(`/qrcodes/${id}`),
+  getPages: () => api.get('/qrcodes/pages')
+}
+
 // 报表API
 export const reportAPI = {
   getDashboard: () => api.get('/reports/dashboard'),

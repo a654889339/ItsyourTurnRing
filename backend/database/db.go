@@ -236,6 +236,19 @@ func createTables() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 
+		// 小程序二维码表
+		`CREATE TABLE IF NOT EXISTS qr_codes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name VARCHAR(100) NOT NULL,
+			platform VARCHAR(20) NOT NULL,
+			page VARCHAR(200) NOT NULL,
+			params TEXT,
+			image_url VARCHAR(500),
+			content TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+
 		// 商品变更日志
 		`CREATE TABLE IF NOT EXISTS product_change_logs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,

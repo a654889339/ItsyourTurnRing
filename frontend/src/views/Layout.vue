@@ -23,6 +23,10 @@
           <span class="nav-icon">🖼️</span>
           <span>轮播图</span>
         </router-link>
+        <router-link to="/qrcodes" class="nav-item" :class="{ active: $route.path === '/qrcodes' }">
+          <span class="nav-icon">📱</span>
+          <span>二维码管理</span>
+        </router-link>
         <router-link to="/reports" class="nav-item" :class="{ active: $route.path === '/reports' }">
           <span class="nav-icon">📈</span>
           <span>销售报表</span>
