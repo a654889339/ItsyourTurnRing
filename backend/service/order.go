@@ -1,0 +1,612 @@
+package service
+
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
+
+	"itsyourturnring/database"
+	"itsyourturnring/model"
+)
+
+type OrderService struct {
+	productService *ProductService
+}
+
+func NewOrderService() *OrderService {
+	return &OrderService{
+		productService: NewProductService(),
+	}
+}
+
+// CreateOrder 创建订单
+func (s *OrderService) CreateOrder(userID int64, req *model.OrderCreateRequest) (*model.Order, error) {
+	db := database.GetDB()
+
+	// 获取收货地址
+	var address model.Address
+	err := db.QueryRow(`
+		SELECT id, name, phone, province, city, district, detail
+		FROM addresses WHERE id = ? AND user_id = ?`, req.AddressID, userID).Scan(
+		&address.ID, &address.Name, &address.Phone, &address.Province,
+		&address.City, &address.District, &address.Detail)
+	if err != nil {
+		return nil, errors.New("收货地址不存在")
+	}
+
+	// 获取购物车商品
+	var cartItems []model.CartItem
+	var totalPrice float64
+
+	for _, cartID := range req.CartIDs {
+		var item model.CartItem
+		var product model.Product
+		var specID sql.NullInt64
+		var specName sql.NullString
+		var priceAdj sql.NullFloat64
+
+		err := db.QueryRow(`
+			SELECT c.id, c.product_id, c.spec_id, c.quantity,
+				p.name, p.price, p.main_image, p.stock,
+				ps.name, ps.price_adjustment
+			FROM cart_items c
+			JOIN products p ON c.product_id = p.id
+			LEFT JOIN product_specs ps ON c.spec_id = ps.id
+			WHERE c.id = ? AND c.user_id = ?`, cartID, userID).Scan(
+			&item.ID, &item.ProductID, &specID, &item.Quantity,
+			&product.Name, &product.Price, &product.MainImage, &product.Stock,
+			&specName, &priceAdj)
+		if err != nil {
+			continue
+		}
+
+		if specID.Valid {
+			specIDVal := specID.Int64
+			item.SpecID = &specIDVal
+		}
+
+		// 检查库存
+		if product.Stock < item.Quantity {
+			return nil, fmt.Errorf("商品 %s 库存不足", product.Name)
+		}
+
+		item.Product = &product
+		if specName.Valid {
+			item.Spec = &model.ProductSpec{
+				Name:            specName.String,
+				PriceAdjustment: priceAdj.Float64,
+			}
+		}
+
+		price := product.Price
+		if priceAdj.Valid {
+			price += priceAdj.Float64
+		}
+		totalPrice += price * float64(item.Quantity)
+
+		cartItems = append(cartItems, item)
+	}
+
+	if len(cartItems) == 0 {
+		return nil, errors.New("购物车为空")
+	}
+
+	// 生成订单号
+	orderNo := fmt.Sprintf("RG%s%04d", time.Now().Format("20060102150405"), time.Now().UnixNano()%10000)
+
+	// 开启事务
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// 创建订单
+	result, err := tx.Exec(`
+		INSERT INTO orders (user_id, order_no, total_price, pay_price, status, pay_status,
+			address_name, address_phone, address_province, address_city, address_district,
+			address_detail, remark, order_source)
+		VALUES (?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?, ?, ?, 'web')`,
+		userID, orderNo, totalPrice, totalPrice,
+		address.Name, address.Phone, address.Province, address.City, address.District,
+		address.Detail, req.Remark)
+	if err != nil {
+		return nil, err
+	}
+
+	orderID, _ := result.LastInsertId()
+
+	// 创建订单项并扣减库存
+	for _, item := range cartItems {
+		price := item.Product.Price
+		specName := ""
+		if item.Spec != nil {
+			price += item.Spec.PriceAdjustment
+			specName = item.Spec.Name
+		}
+
+		_, err = tx.Exec(`
+			INSERT INTO order_items (order_id, product_id, spec_id, product_name, product_image, spec_name, price, quantity)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			orderID, item.ProductID, item.SpecID, item.Product.Name, item.Product.MainImage,
+			specName, price, item.Quantity)
+		if err != nil {
+			return nil, err
+		}
+
+		// 扣减库存
+		_, err = tx.Exec("UPDATE products SET stock = stock - ? WHERE id = ?", item.Quantity, item.ProductID)
+		if err != nil {
+			return nil, err
+		}
+
+		// 删除购物车
+		_, _ = tx.Exec("DELETE FROM cart_items WHERE id = ?", item.ID)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return s.GetOrderByID(orderID, userID)
+}
+
+// GetOrderByID 根据ID获取订单
+func (s *OrderService) GetOrderByID(orderID int64, userID int64) (*model.Order, error) {
+	db := database.GetDB()
+
+	var order model.Order
+	var payMethod, expressCompany, expressNo, remark sql.NullString
+	var payTime, shipTime, receiveTime sql.NullTime
+
+	err := db.QueryRow(`
+		SELECT id, user_id, order_no, total_price, pay_price, freight, status, pay_status,
+			pay_method, pay_time, ship_time, receive_time,
+			address_name, address_phone, address_province, address_city, address_district,
+			address_detail, express_company, express_no, remark, order_source,
+			created_at, updated_at
+		FROM orders WHERE id = ? AND user_id = ?`, orderID, userID).Scan(
+		&order.ID, &order.UserID, &order.OrderNo, &order.TotalPrice, &order.PayPrice,
+		&order.Freight, &order.Status, &order.PayStatus, &payMethod, &payTime,
+		&shipTime, &receiveTime, &order.AddressName, &order.AddressPhone,
+		&order.AddressProvince, &order.AddressCity, &order.AddressDistrict,
+		&order.AddressDetail, &expressCompany, &expressNo, &remark,
+		&order.OrderSource, &order.CreatedAt, &order.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	if payMethod.Valid {
+		order.PayMethod = payMethod.String
+	}
+	if expressCompany.Valid {
+		order.ExpressCompany = expressCompany.String
+	}
+	if expressNo.Valid {
+		order.ExpressNo = expressNo.String
+	}
+	if remark.Valid {
+		order.Remark = remark.String
+	}
+	if payTime.Valid {
+		order.PayTime = &payTime.Time
+	}
+	if shipTime.Valid {
+		order.ShipTime = &shipTime.Time
+	}
+	if receiveTime.Valid {
+		order.ReceiveTime = &receiveTime.Time
+	}
+
+	// 获取订单项
+	order.Items, _ = s.GetOrderItems(orderID)
+
+	return &order, nil
+}
+
+// GetOrderByOrderNo 根据订单号获取订单
+func (s *OrderService) GetOrderByOrderNo(orderNo string) (*model.Order, error) {
+	db := database.GetDB()
+
+	var orderID, userID int64
+	err := db.QueryRow("SELECT id, user_id FROM orders WHERE order_no = ?", orderNo).Scan(&orderID, &userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.GetOrderByID(orderID, userID)
+}
+
+// GetOrderItems 获取订单项
+func (s *OrderService) GetOrderItems(orderID int64) ([]model.OrderItem, error) {
+	db := database.GetDB()
+
+	rows, err := db.Query(`
+		SELECT id, order_id, product_id, spec_id, product_name, product_image,
+			spec_name, price, quantity, created_at
+		FROM order_items WHERE order_id = ?`, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.OrderItem
+	for rows.Next() {
+		var item model.OrderItem
+		var specID sql.NullInt64
+		var productImage, specName sql.NullString
+
+		err := rows.Scan(&item.ID, &item.OrderID, &item.ProductID, &specID,
+			&item.ProductName, &productImage, &specName, &item.Price,
+			&item.Quantity, &item.CreatedAt)
+		if err != nil {
+			continue
+		}
+
+		if specID.Valid {
+			specIDVal := specID.Int64
+			item.SpecID = &specIDVal
+		}
+		if productImage.Valid {
+			item.ProductImage = productImage.String
+		}
+		if specName.Valid {
+			item.SpecName = specName.String
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+// ListOrders 订单列表
+func (s *OrderService) ListOrders(query *model.PageQuery, userID int64) (*model.PageResult, error) {
+	db := database.GetDB()
+
+	where := "WHERE user_id = ?"
+	args := []interface{}{userID}
+
+	if query.Status != "" {
+		where += " AND status = ?"
+		args = append(args, query.Status)
+	}
+	if query.Keyword != "" {
+		where += " AND order_no LIKE ?"
+		args = append(args, "%"+query.Keyword+"%")
+	}
+
+	var total int64
+	err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM orders %s", where), args...).Scan(&total)
+	if err != nil {
+		return nil, err
+	}
+
+	page := query.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := query.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	dataSQL := fmt.Sprintf(`
+		SELECT id, user_id, order_no, total_price, pay_price, freight, status, pay_status,
+			pay_method, pay_time, ship_time, receive_time,
+			address_name, address_phone, address_province, address_city, address_district,
+			address_detail, express_company, express_no, remark, order_source,
+			created_at, updated_at
+		FROM orders %s ORDER BY created_at DESC LIMIT ? OFFSET ?`, where)
+
+	args = append(args, pageSize, offset)
+	rows, err := db.Query(dataSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []model.Order
+	for rows.Next() {
+		var order model.Order
+		var payMethod, expressCompany, expressNo, remark sql.NullString
+		var payTime, shipTime, receiveTime sql.NullTime
+
+		err := rows.Scan(
+			&order.ID, &order.UserID, &order.OrderNo, &order.TotalPrice, &order.PayPrice,
+			&order.Freight, &order.Status, &order.PayStatus, &payMethod, &payTime,
+			&shipTime, &receiveTime, &order.AddressName, &order.AddressPhone,
+			&order.AddressProvince, &order.AddressCity, &order.AddressDistrict,
+			&order.AddressDetail, &expressCompany, &expressNo, &remark,
+			&order.OrderSource, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			continue
+		}
+
+		if payMethod.Valid {
+			order.PayMethod = payMethod.String
+		}
+		if expressCompany.Valid {
+			order.ExpressCompany = expressCompany.String
+		}
+		if expressNo.Valid {
+			order.ExpressNo = expressNo.String
+		}
+		if remark.Valid {
+			order.Remark = remark.String
+		}
+		if payTime.Valid {
+			order.PayTime = &payTime.Time
+		}
+		if shipTime.Valid {
+			order.ShipTime = &shipTime.Time
+		}
+		if receiveTime.Valid {
+			order.ReceiveTime = &receiveTime.Time
+		}
+
+		// 获取订单项
+		order.Items, _ = s.GetOrderItems(order.ID)
+
+		orders = append(orders, order)
+	}
+
+	return &model.PageResult{
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+		Data:     orders,
+	}, nil
+}
+
+// UpdateOrderStatus 更新订单状态
+func (s *OrderService) UpdateOrderStatus(orderID int64, userID int64, req *model.OrderUpdateStatusRequest) error {
+	db := database.GetDB()
+
+	// 验证订单所属
+	var ownerID int64
+	err := db.QueryRow("SELECT user_id FROM orders WHERE id = ?", orderID).Scan(&ownerID)
+	if err != nil {
+		return errors.New("订单不存在")
+	}
+	if ownerID != userID {
+		return errors.New("无权修改此订单")
+	}
+
+	updateSQL := "UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP"
+	args := []interface{}{req.Status}
+
+	if req.Status == "shipped" {
+		updateSQL += ", ship_time = CURRENT_TIMESTAMP, express_company = ?, express_no = ?"
+		args = append(args, req.ExpressCompany, req.ExpressNo)
+	} else if req.Status == "received" || req.Status == "completed" {
+		updateSQL += ", receive_time = CURRENT_TIMESTAMP"
+	}
+
+	updateSQL += " WHERE id = ?"
+	args = append(args, orderID)
+
+	_, err = db.Exec(updateSQL, args...)
+	return err
+}
+
+// CancelOrder 取消订单
+func (s *OrderService) CancelOrder(orderID int64, userID int64) error {
+	db := database.GetDB()
+
+	// 获取订单状态
+	var status string
+	err := db.QueryRow("SELECT status FROM orders WHERE id = ? AND user_id = ?", orderID, userID).Scan(&status)
+	if err != nil {
+		return errors.New("订单不存在")
+	}
+
+	if status != "pending" {
+		return errors.New("只能取消待付款订单")
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 恢复库存
+	rows, err := tx.Query("SELECT product_id, quantity FROM order_items WHERE order_id = ?", orderID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var productID int64
+		var quantity int
+		if err := rows.Scan(&productID, &quantity); err != nil {
+			continue
+		}
+		_, _ = tx.Exec("UPDATE products SET stock = stock + ? WHERE id = ?", quantity, productID)
+	}
+
+	// 更新订单状态
+	_, err = tx.Exec("UPDATE orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?", orderID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// PayOrder 支付订单(模拟)
+func (s *OrderService) PayOrder(orderID int64, userID int64, payMethod string) error {
+	db := database.GetDB()
+
+	result, err := db.Exec(`
+		UPDATE orders SET status = 'paid', pay_status = 'paid', pay_method = ?,
+			pay_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND user_id = ? AND status = 'pending'`,
+		payMethod, orderID, userID)
+	if err != nil {
+		return err
+	}
+
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return errors.New("订单不存在或状态不正确")
+	}
+
+	// 更新销量
+	rows, err := db.Query("SELECT product_id, quantity FROM order_items WHERE order_id = ?", orderID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var productID int64
+			var quantity int
+			if rows.Scan(&productID, &quantity) == nil {
+				_, _ = db.Exec("UPDATE products SET sales = sales + ? WHERE id = ?", quantity, productID)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ConfirmReceive 确认收货
+func (s *OrderService) ConfirmReceive(orderID int64, userID int64) error {
+	db := database.GetDB()
+
+	result, err := db.Exec(`
+		UPDATE orders SET status = 'received', receive_time = CURRENT_TIMESTAMP,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND user_id = ? AND status = 'shipped'`,
+		orderID, userID)
+	if err != nil {
+		return err
+	}
+
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return errors.New("订单不存在或状态不正确")
+	}
+
+	return nil
+}
+
+// AdminListOrders 管理员订单列表
+func (s *OrderService) AdminListOrders(query *model.PageQuery, adminID int64) (*model.PageResult, error) {
+	db := database.GetDB()
+
+	// 管理员可以查看所有订单
+	where := "WHERE 1=1"
+	args := []interface{}{}
+
+	if query.Status != "" {
+		where += " AND status = ?"
+		args = append(args, query.Status)
+	}
+	if query.Keyword != "" {
+		where += " AND (order_no LIKE ? OR address_name LIKE ? OR address_phone LIKE ?)"
+		args = append(args, "%"+query.Keyword+"%", "%"+query.Keyword+"%", "%"+query.Keyword+"%")
+	}
+
+	var total int64
+	err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM orders %s", where), args...).Scan(&total)
+	if err != nil {
+		return nil, err
+	}
+
+	page := query.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := query.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	dataSQL := fmt.Sprintf(`
+		SELECT id, user_id, order_no, total_price, pay_price, freight, status, pay_status,
+			pay_method, pay_time, ship_time, receive_time,
+			address_name, address_phone, address_province, address_city, address_district,
+			address_detail, express_company, express_no, remark, order_source,
+			created_at, updated_at
+		FROM orders %s ORDER BY created_at DESC LIMIT ? OFFSET ?`, where)
+
+	args = append(args, pageSize, offset)
+	rows, err := db.Query(dataSQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []model.Order
+	for rows.Next() {
+		var order model.Order
+		var payMethod, expressCompany, expressNo, remark sql.NullString
+		var payTime, shipTime, receiveTime sql.NullTime
+
+		err := rows.Scan(
+			&order.ID, &order.UserID, &order.OrderNo, &order.TotalPrice, &order.PayPrice,
+			&order.Freight, &order.Status, &order.PayStatus, &payMethod, &payTime,
+			&shipTime, &receiveTime, &order.AddressName, &order.AddressPhone,
+			&order.AddressProvince, &order.AddressCity, &order.AddressDistrict,
+			&order.AddressDetail, &expressCompany, &expressNo, &remark,
+			&order.OrderSource, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			continue
+		}
+
+		if payMethod.Valid {
+			order.PayMethod = payMethod.String
+		}
+		if expressCompany.Valid {
+			order.ExpressCompany = expressCompany.String
+		}
+		if expressNo.Valid {
+			order.ExpressNo = expressNo.String
+		}
+		if remark.Valid {
+			order.Remark = remark.String
+		}
+		if payTime.Valid {
+			order.PayTime = &payTime.Time
+		}
+		if shipTime.Valid {
+			order.ShipTime = &shipTime.Time
+		}
+		if receiveTime.Valid {
+			order.ReceiveTime = &receiveTime.Time
+		}
+
+		order.Items, _ = s.GetOrderItems(order.ID)
+		orders = append(orders, order)
+	}
+
+	return &model.PageResult{
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+		Data:     orders,
+	}, nil
+}
+
+// AdminUpdateOrderStatus 管理员更新订单状态
+func (s *OrderService) AdminUpdateOrderStatus(orderID int64, req *model.OrderUpdateStatusRequest) error {
+	db := database.GetDB()
+
+	updateSQL := "UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP"
+	args := []interface{}{req.Status}
+
+	if req.Status == "shipped" {
+		updateSQL += ", ship_time = CURRENT_TIMESTAMP, express_company = ?, express_no = ?"
+		args = append(args, req.ExpressCompany, req.ExpressNo)
+	}
+
+	updateSQL += " WHERE id = ?"
+	args = append(args, orderID)
+
+	_, err := db.Exec(updateSQL, args...)
+	return err
+}

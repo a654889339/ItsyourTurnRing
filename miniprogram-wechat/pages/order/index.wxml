@@ -1,0 +1,76 @@
+<!-- 订单列表页 -->
+<view class="page-order">
+  <!-- 未登录 -->
+  <view class="not-login" wx:if="{{!app.globalData.token}}">
+    <view class="empty-icon">📦</view>
+    <text>登录后查看订单</text>
+    <view class="btn btn-primary" bindtap="onLogin">微信登录</view>
+  </view>
+
+  <view wx:else>
+    <!-- 状态筛选 -->
+    <scroll-view scroll-x class="status-tabs">
+      <view
+        wx:for="{{statusTabs}}"
+        wx:key="value"
+        class="tab-item {{currentStatus === item.value ? 'active' : ''}}"
+        bindtap="onTabChange"
+        data-status="{{item.value}}"
+      >{{item.label}}</view>
+    </scroll-view>
+
+    <!-- 订单列表 -->
+    <view class="order-list" wx:if="{{orders.length > 0}}">
+      <view class="order-card" wx:for="{{orders}}" wx:key="id">
+        <view class="order-header">
+          <text class="order-no">订单号: {{item.order_no}}</text>
+          <text class="order-status status-{{item.status}}">{{getStatusText(item.status)}}</text>
+        </view>
+
+        <view class="order-items">
+          <view class="order-item" wx:for="{{item.items}}" wx:for-item="product" wx:key="id">
+            <image src="{{product.product_image}}" mode="aspectFill" class="item-image" />
+            <view class="item-info">
+              <view class="item-name">{{product.product_name}}</view>
+              <view class="item-spec" wx:if="{{product.spec_name}}">{{product.spec_name}}</view>
+              <view class="item-price">¥{{product.price}} × {{product.quantity}}</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="order-footer">
+          <view class="order-total">
+            共{{getTotalCount(item)}}件商品，合计:
+            <text class="total-price">¥{{item.pay_price}}</text>
+          </view>
+          <view class="order-actions">
+            <view
+              wx:if="{{item.status === 'pending'}}"
+              class="btn btn-small btn-primary"
+              bindtap="onPay"
+              data-id="{{item.id}}"
+            >去付款</view>
+            <view
+              wx:if="{{item.status === 'pending'}}"
+              class="btn btn-small btn-secondary"
+              bindtap="onCancel"
+              data-id="{{item.id}}"
+            >取消</view>
+            <view
+              wx:if="{{item.status === 'shipped'}}"
+              class="btn btn-small btn-primary"
+              bindtap="onReceive"
+              data-id="{{item.id}}"
+            >确认收货</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty" wx:else>
+      <view class="empty-icon">📦</view>
+      <text class="empty-text">暂无订单</text>
+    </view>
+  </view>
+</view>

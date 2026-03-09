@@ -1,0 +1,52 @@
+<!-- 我的页面 -->
+<view class="page-user">
+  <!-- 用户信息 -->
+  <view class="user-header">
+    <view class="user-info" wx:if="{{isLogin}}">
+      <view class="user-avatar">{{userInfo.username ? userInfo.username[0] : 'U'}}</view>
+      <view class="user-name">{{userInfo.username || '用户'}}</view>
+    </view>
+    <view class="not-login" wx:else bindtap="onLogin">
+      <view class="user-avatar">?</view>
+      <view class="login-text">点击登录</view>
+    </view>
+  </view>
+
+  <!-- 菜单列表 -->
+  <view class="menu-list">
+    <navigator url="/pages/order/index" class="menu-item">
+      <text class="menu-icon">📦</text>
+      <text class="menu-text">我的订单</text>
+      <text class="menu-arrow">›</text>
+    </navigator>
+
+    <navigator url="/pages/address/index" class="menu-item">
+      <text class="menu-icon">📍</text>
+      <text class="menu-text">收货地址</text>
+      <text class="menu-arrow">›</text>
+    </navigator>
+
+    <navigator url="/pages/favorite/index" class="menu-item">
+      <text class="menu-icon">❤️</text>
+      <text class="menu-text">我的收藏</text>
+      <text class="menu-arrow">›</text>
+    </navigator>
+
+    <view class="menu-item" bindtap="onContact">
+      <text class="menu-icon">📞</text>
+      <text class="menu-text">联系客服</text>
+      <text class="menu-arrow">›</text>
+    </view>
+
+    <view class="menu-item">
+      <text class="menu-icon">ℹ️</text>
+      <text class="menu-text">关于我们</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 退出登录 -->
+  <view class="logout-section" wx:if="{{isLogin}}">
+    <view class="btn btn-secondary" bindtap="onLogout">退出登录</view>
+  </view>
+</view>

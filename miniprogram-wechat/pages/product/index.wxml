@@ -1,0 +1,76 @@
+<!-- 商品详情页 -->
+<view class="page-product" wx:if="{{product}}">
+  <!-- 商品图片 -->
+  <view class="product-gallery">
+    <image src="{{product.main_image}}" mode="aspectFill" class="main-image" />
+  </view>
+
+  <!-- 商品信息 -->
+  <view class="product-info card">
+    <view class="product-name">{{product.name}}</view>
+    <view class="product-price">
+      <text class="current-price">¥{{product.price}}</text>
+      <text class="original-price" wx:if="{{product.original_price}}">¥{{product.original_price}}</text>
+    </view>
+    <view class="product-meta">
+      <text wx:if="{{product.material}}">材质: {{product.material}}</text>
+      <text wx:if="{{product.size}}">尺寸: {{product.size}}</text>
+      <text wx:if="{{product.color}}">颜色: {{product.color}}</text>
+    </view>
+    <view class="product-sales">
+      已售 {{product.sales}} 件 | 库存 {{product.stock}} 件
+    </view>
+  </view>
+
+  <!-- 商品描述 -->
+  <view class="card" wx:if="{{product.description}}">
+    <view class="card-title">商品详情</view>
+    <view class="product-desc">{{product.description}}</view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="action-bar">
+    <view class="action-btn cart" bindtap="onAddToCart">
+      <text class="iconfont">🛒</text>
+      <text>加入购物车</text>
+    </view>
+    <view class="action-btn buy" bindtap="onBuyNow">立即购买</view>
+  </view>
+
+  <!-- 数量选择弹窗 -->
+  <view class="action-sheet {{showActionSheet ? 'show' : ''}}" catchtouchmove="true">
+    <view class="mask" bindtap="onCloseActionSheet"></view>
+    <view class="sheet-content">
+      <view class="sheet-header">
+        <text>{{actionType === 'buy' ? '立即购买' : '加入购物车'}}</text>
+        <text class="close" bindtap="onCloseActionSheet">×</text>
+      </view>
+      <view class="sheet-body">
+        <view class="product-preview">
+          <image src="{{product.main_image}}" mode="aspectFill" />
+          <view class="preview-info">
+            <view class="preview-price">¥{{product.price}}</view>
+            <view class="preview-stock">库存 {{product.stock}} 件</view>
+          </view>
+        </view>
+        <view class="quantity-row">
+          <text>数量</text>
+          <view class="quantity-control">
+            <view class="qty-btn" bindtap="onQuantityChange" data-type="minus">-</view>
+            <text class="qty-value">{{quantity}}</text>
+            <view class="qty-btn" bindtap="onQuantityChange" data-type="plus">+</view>
+          </view>
+        </view>
+      </view>
+      <view class="sheet-footer">
+        <view class="confirm-btn" bindtap="onConfirmAction">确定</view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- 加载中 -->
+<view class="loading" wx:else>
+  <view class="loading-icon">⏳</view>
+  <text>加载中...</text>
+</view>

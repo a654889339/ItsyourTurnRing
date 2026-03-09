@@ -1,0 +1,64 @@
+<!-- 购物车页 -->
+<view class="page-cart">
+  <!-- 未登录 -->
+  <view class="not-login" wx:if="{{!app.globalData.token}}">
+    <view class="empty-icon">🛒</view>
+    <text>登录后查看购物车</text>
+    <view class="btn btn-primary" bindtap="onLogin">微信登录</view>
+  </view>
+
+  <!-- 购物车列表 -->
+  <view wx:elif="{{cartItems.length > 0}}">
+    <view class="cart-list">
+      <view class="cart-item" wx:for="{{cartItems}}" wx:key="id">
+        <view
+          class="item-checkbox {{selectedIds.includes(item.id) ? 'checked' : ''}}"
+          bindtap="onSelectItem"
+          data-id="{{item.id}}"
+        >✓</view>
+
+        <image src="{{item.product.main_image}}" mode="aspectFill" class="item-image" />
+
+        <view class="item-info">
+          <view class="item-name">{{item.product.name}}</view>
+          <view class="item-spec" wx:if="{{item.spec}}">{{item.spec.name}}: {{item.spec.value}}</view>
+          <view class="item-price">¥{{item.product.price + (item.spec.price_adjustment || 0)}}</view>
+        </view>
+
+        <view class="item-actions">
+          <view class="quantity-control">
+            <view class="qty-btn" bindtap="onQuantityChange" data-id="{{item.id}}" data-type="minus">-</view>
+            <text class="qty-value">{{item.quantity}}</text>
+            <view class="qty-btn" bindtap="onQuantityChange" data-id="{{item.id}}" data-type="plus">+</view>
+          </view>
+          <view class="delete-btn" bindtap="onDeleteItem" data-id="{{item.id}}">删除</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部结算栏 -->
+    <view class="checkout-bar">
+      <view
+        class="select-all {{selectedIds.length === cartItems.length ? 'checked' : ''}}"
+        bindtap="onSelectAll"
+      >
+        <view class="checkbox">✓</view>
+        <text>全选</text>
+      </view>
+      <view class="total">
+        <text>合计: </text>
+        <text class="total-price">¥{{totalPrice}}</text>
+      </view>
+      <view class="checkout-btn {{selectedIds.length === 0 ? 'disabled' : ''}}" bindtap="onCheckout">
+        结算({{selectedIds.length}})
+      </view>
+    </view>
+  </view>
+
+  <!-- 空购物车 -->
+  <view class="empty" wx:else>
+    <view class="empty-icon">🛒</view>
+    <text class="empty-text">购物车是空的</text>
+    <navigator url="/pages/index/index" class="btn btn-primary">去逛逛</navigator>
+  </view>
+</view>

@@ -1,0 +1,20 @@
+{
+  "format": 2,
+  "compileOptions": {
+    "component2": true,
+    "enableAppxNg": true,
+    "enableNodeModuleBabelTransform": true
+  },
+  "uploadExclude": [
+    "node_modules/**"
+  ],
+  "assetsInclude": [
+    "./**"
+  ],
+  "developOptions": {
+    "hotReload": true
+  },
+  "pluginResolution": {
+    "enable": false
+  }
+}

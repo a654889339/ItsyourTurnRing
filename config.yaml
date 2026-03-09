@@ -1,0 +1,167 @@
+# ItsyourTurnRing 集中配置文件
+# 所有敏感配置项集中管理，避免与 ItsyourTurnMy 冲突
+
+# ===============================
+# 服务器配置
+# ===============================
+server:
+  http_port: 8180          # HTTP端口 (ItsyourTurnMy使用8080)
+  grpc_port: 9190          # gRPC端口 (ItsyourTurnMy使用9090)
+  mode: release            # debug/release
+  frontend_port: 5101      # 前端端口 (ItsyourTurnMy使用5001)
+  backend_port: 5102       # 后端API端口 (ItsyourTurnMy使用5002)
+
+# ===============================
+# 数据库配置
+# ===============================
+database:
+  driver: sqlite           # sqlite / mysql
+  sqlite_path: ./data/ring.db
+  mysql:
+    host: localhost
+    port: 3307             # (ItsyourTurnMy使用3306)
+    user: ring_user
+    password: ${MYSQL_PASSWORD:ring_secret_2024}
+    database: itsyourturn_ring
+
+# ===============================
+# JWT认证配置
+# ===============================
+jwt:
+  secret: ${JWT_SECRET:ring_jwt_secret_key_2024_very_secure}
+  expire_hours: 24
+
+# ===============================
+# 域名与IP配置
+# ===============================
+domain:
+  web: https://ring.itsyourturn.top          # 网页域名
+  api: https://ring-api.itsyourturn.top      # API域名
+  h5: https://ring-h5.itsyourturn.top        # H5域名
+  ip: 0.0.0.0                                 # 绑定IP
+
+# ===============================
+# 腾讯云配置
+# ===============================
+tencent_cloud:
+  # COS对象存储
+  cos:
+    enabled: false
+    secret_id: ${COS_SECRET_ID:}
+    secret_key: ${COS_SECRET_KEY:}
+    bucket: ring-images-1234567890           # 不同于ItsyourTurnMy的bucket
+    region: ap-guangzhou
+    base_url: https://ring-images-1234567890.cos.ap-guangzhou.myqcloud.com
+
+  # 云短信SMS
+  sms:
+    enabled: false
+    secret_id: ${SMS_SECRET_ID:}
+    secret_key: ${SMS_SECRET_KEY:}
+    app_id: ""
+    sign_name: ""
+    template_id: ""
+
+# ===============================
+# 邮件服务配置
+# ===============================
+email:
+  enabled: true
+  host: smtp.qq.com
+  port: 587
+  username: ${EMAIL_USERNAME:}
+  password: ${EMAIL_PASSWORD:}
+  from_name: ItsyourTurnRing
+
+# ===============================
+# 微信小程序配置
+# ===============================
+wechat_miniprogram:
+  app_id: ${WECHAT_MP_APPID:}
+  app_secret: ${WECHAT_MP_SECRET:}
+  # 小程序页面路径
+  pages:
+    home: pages/index/index
+    product: pages/product/index
+    cart: pages/cart/index
+    order: pages/order/index
+    user: pages/user/index
+
+# ===============================
+# 支付宝小程序配置
+# ===============================
+alipay_miniprogram:
+  app_id: ${ALIPAY_MP_APPID:}
+  private_key: ${ALIPAY_PRIVATE_KEY:}
+  alipay_public_key: ${ALIPAY_PUBLIC_KEY:}
+  # 小程序页面路径
+  pages:
+    home: pages/index/index
+    product: pages/product/index
+    cart: pages/cart/index
+    order: pages/order/index
+    user: pages/user/index
+
+# ===============================
+# 微信支付配置
+# ===============================
+wechat_pay:
+  enabled: false
+  mch_id: ${WECHAT_PAY_MCH_ID:}
+  api_key: ${WECHAT_PAY_API_KEY:}
+  cert_path: ./certs/wechat/apiclient_cert.pem
+  key_path: ./certs/wechat/apiclient_key.pem
+  notify_url: https://ring-api.itsyourturn.top/api/v1/pay/wechat/notify
+
+# ===============================
+# 支付宝支付配置
+# ===============================
+alipay_pay:
+  enabled: false
+  app_id: ${ALIPAY_PAY_APPID:}
+  private_key_path: ./certs/alipay/app_private_key.pem
+  alipay_public_key_path: ./certs/alipay/alipay_public_key.pem
+  notify_url: https://ring-api.itsyourturn.top/api/v1/pay/alipay/notify
+
+# ===============================
+# CORS跨域配置
+# ===============================
+cors:
+  allowed_origins:
+    - "*"
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  allowed_headers:
+    - "*"
+
+# ===============================
+# 日志配置
+# ===============================
+log:
+  level: info              # debug/info/warn/error
+  output: stdout           # stdout/file
+  file_path: ./logs/ring.log
+
+# ===============================
+# 商品分类配置
+# ===============================
+product_categories:
+  - id: bracelet
+    name: 手链
+    icon: bracelet.png
+  - id: necklace
+    name: 项链
+    icon: necklace.png
+  - id: accessory
+    name: 配饰
+    icon: accessory.png
+  - id: ring
+    name: 戒指
+    icon: ring.png
+  - id: earring
+    name: 耳饰
+    icon: earring.png

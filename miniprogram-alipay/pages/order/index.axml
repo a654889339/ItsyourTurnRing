@@ -1,0 +1,47 @@
+<view class="page-order">
+  <view class="not-login" a:if="{{!app.globalData.token}}">
+    <view class="empty-icon">📦</view>
+    <text>登录后查看订单</text>
+    <view class="btn btn-primary" onTap="onLogin">支付宝登录</view>
+  </view>
+
+  <view a:else>
+    <scroll-view scroll-x="{{true}}" class="status-tabs">
+      <view class="tab-item {{currentStatus === '' ? 'active' : ''}}" onTap="onTabChange" data-status="">全部</view>
+      <view class="tab-item {{currentStatus === 'pending' ? 'active' : ''}}" onTap="onTabChange" data-status="pending">待付款</view>
+      <view class="tab-item {{currentStatus === 'paid' ? 'active' : ''}}" onTap="onTabChange" data-status="paid">已付款</view>
+      <view class="tab-item {{currentStatus === 'shipped' ? 'active' : ''}}" onTap="onTabChange" data-status="shipped">已发货</view>
+    </scroll-view>
+
+    <view class="order-list" a:if="{{orders.length > 0}}">
+      <view class="order-card" a:for="{{orders}}" a:key="id">
+        <view class="order-header">
+          <text class="order-no">订单号: {{item.order_no}}</text>
+          <text class="order-status">{{item.status}}</text>
+        </view>
+        <view class="order-items">
+          <view class="order-item" a:for="{{item.items}}" a:for-item="product" a:key="id">
+            <image src="{{product.product_image}}" mode="aspectFill" class="item-image" />
+            <view class="item-info">
+              <view class="item-name">{{product.product_name}}</view>
+              <view class="item-price">¥{{product.price}} × {{product.quantity}}</view>
+            </view>
+          </view>
+        </view>
+        <view class="order-footer">
+          <view class="order-total">合计: <text class="total-price">¥{{item.pay_price}}</text></view>
+          <view class="order-actions">
+            <view a:if="{{item.status === 'pending'}}" class="btn btn-small btn-primary" onTap="onPay" data-id="{{item.id}}">去付款</view>
+            <view a:if="{{item.status === 'pending'}}" class="btn btn-small btn-secondary" onTap="onCancel" data-id="{{item.id}}">取消</view>
+            <view a:if="{{item.status === 'shipped'}}" class="btn btn-small btn-primary" onTap="onReceive" data-id="{{item.id}}">确认收货</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty" a:else>
+      <view class="empty-icon">📦</view>
+      <text class="empty-text">暂无订单</text>
+    </view>
+  </view>
+</view>

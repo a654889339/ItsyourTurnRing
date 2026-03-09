@@ -1,0 +1,44 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+*.local
+
+# Go
+backend/vendor/
+backend/tmp/
+
+# Node.js
+node_modules/
+dist/
+.output/
+
+# Build
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Database
+*.db
+data/
+
+# Logs
+logs/
+*.log
+
+# Certificates
+certs/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Mini Program
+miniprogram-wechat/miniprogram_npm/
+miniprogram-alipay/.tea/

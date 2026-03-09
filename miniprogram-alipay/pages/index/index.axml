@@ -1,0 +1,98 @@
+<!-- 首页 -->
+<view class="page-index">
+  <!-- 轮播图 -->
+  <swiper class="banner-swiper" indicator-dots="{{true}}" autoplay="{{true}}" circular="{{true}}" a:if="{{banners.length > 0}}">
+    <swiper-item a:for="{{banners}}" a:key="id">
+      <image src="{{item.image}}" mode="aspectFill" class="banner-image" />
+    </swiper-item>
+  </swiper>
+
+  <!-- 分类导航 -->
+  <scroll-view scroll-x="{{true}}" class="category-nav">
+    <view
+      a:for="{{categories}}"
+      a:key="id"
+      class="category-item {{currentCategory === item.code ? 'active' : ''}}"
+      onTap="onCategoryTap"
+      data-code="{{item.code}}"
+    >
+      <view class="category-icon">
+        <text a:if="{{item.code === 'bracelet'}}">📿</text>
+        <text a:elif="{{item.code === 'necklace'}}">📿</text>
+        <text a:elif="{{item.code === 'ring'}}">💍</text>
+        <text a:elif="{{item.code === 'earring'}}">👂</text>
+        <text a:else>✨</text>
+      </view>
+      <view class="category-name">{{item.name}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- 精选推荐 -->
+  <view class="section" a:if="{{featuredProducts.length > 0}}">
+    <view class="section-title">精选推荐</view>
+    <scroll-view scroll-x="{{true}}" class="product-scroll">
+      <view
+        a:for="{{featuredProducts}}"
+        a:key="id"
+        class="product-scroll-item"
+        onTap="onProductTap"
+        data-id="{{item.id}}"
+      >
+        <image src="{{item.main_image}}" mode="aspectFill" class="scroll-item-image" />
+        <view class="scroll-item-name">{{item.name}}</view>
+        <view class="scroll-item-price">¥{{item.price}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 新品上市 -->
+  <view class="section" a:if="{{newProducts.length > 0}}">
+    <view class="section-title">新品上市</view>
+    <scroll-view scroll-x="{{true}}" class="product-scroll">
+      <view
+        a:for="{{newProducts}}"
+        a:key="id"
+        class="product-scroll-item"
+        onTap="onProductTap"
+        data-id="{{item.id}}"
+      >
+        <view class="badge new">新品</view>
+        <image src="{{item.main_image}}" mode="aspectFill" class="scroll-item-image" />
+        <view class="scroll-item-name">{{item.name}}</view>
+        <view class="scroll-item-price">¥{{item.price}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 商品列表 -->
+  <view class="section">
+    <view class="section-title">全部商品</view>
+    <view class="product-grid">
+      <view
+        a:for="{{products}}"
+        a:key="id"
+        class="product-card"
+        onTap="onProductTap"
+        data-id="{{item.id}}"
+      >
+        <image src="{{item.main_image}}" mode="aspectFill" class="product-image" />
+        <view class="product-info">
+          <view class="product-name">{{item.name}}</view>
+          <view class="product-material" a:if="{{item.material}}">{{item.material}}</view>
+          <view class="product-price">
+            <text class="price">¥{{item.price}}</text>
+            <text class="price-original" a:if="{{item.original_price}}">¥{{item.original_price}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="load-more" a:if="{{loading}}">加载中...</view>
+  <view class="load-more" a:elif="{{!hasMore && products.length > 0}}">没有更多了</view>
+
+  <view class="empty" a:if="{{!loading && products.length === 0}}">
+    <view class="empty-icon">💍</view>
+    <view class="empty-text">暂无商品</view>
+  </view>
+</view>
