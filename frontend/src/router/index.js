@@ -29,6 +29,11 @@ const routes = [
         component: () => import('../views/Orders.vue')
       },
       {
+        path: 'create-order',
+        name: 'CreateOrder',
+        component: () => import('../views/CreateOrder.vue')
+      },
+      {
         path: 'banners',
         name: 'Banners',
         component: () => import('../views/Banners.vue')

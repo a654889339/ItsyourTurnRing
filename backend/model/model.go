@@ -282,6 +282,25 @@ type OrderCreateRequest struct {
 	Remark    string `json:"remark"`
 }
 
+// AdminOrderItem 管理员下单商品项
+type AdminOrderItem struct {
+	ProductID int64  `json:"product_id"`
+	SpecID    *int64 `json:"spec_id"`
+	Quantity  int    `json:"quantity"`
+}
+
+// AdminOrderRequest 管理员快速下单请求
+type AdminOrderRequest struct {
+	Items           []AdminOrderItem `json:"items"`
+	AddressName     string           `json:"address_name"`
+	AddressPhone    string           `json:"address_phone"`
+	AddressProvince string           `json:"address_province"`
+	AddressCity     string           `json:"address_city"`
+	AddressDistrict string           `json:"address_district"`
+	AddressDetail   string           `json:"address_detail"`
+	Remark          string           `json:"remark"`
+}
+
 // OrderUpdateStatusRequest 更新订单状态请求
 type OrderUpdateStatusRequest struct {
 	Status         string `json:"status"`

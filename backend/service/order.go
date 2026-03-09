@@ -610,3 +610,91 @@ func (s *OrderService) AdminUpdateOrderStatus(orderID int64, req *model.OrderUpd
 	_, err := db.Exec(updateSQL, args...)
 	return err
 }
+
+// CreateAdminOrder 管理员快速下单（不经购物车）
+func (s *OrderService) CreateAdminOrder(userID int64, req *model.AdminOrderRequest) (*model.Order, error) {
+	db := database.GetDB()
+
+	if len(req.Items) == 0 {
+		return nil, errors.New("请选择商品")
+	}
+	if req.AddressName == "" || req.AddressPhone == "" || req.AddressDetail == "" {
+		return nil, errors.New("请填写收货信息")
+	}
+
+	orderNo := fmt.Sprintf("A%s%04d", time.Now().Format("20060102150405"), time.Now().Nanosecond()/100000)
+
+	var totalPrice float64
+	var orderItems []model.OrderItem
+
+	for _, item := range req.Items {
+		if item.Quantity <= 0 {
+			continue
+		}
+		var product model.Product
+		var mainImage sql.NullString
+		err := db.QueryRow(`SELECT id, name, price, main_image, stock FROM products WHERE id = ?`, item.ProductID).
+			Scan(&product.ID, &product.Name, &product.Price, &mainImage, &product.Stock)
+		if err != nil {
+			return nil, fmt.Errorf("商品(ID:%d)不存在", item.ProductID)
+		}
+		if mainImage.Valid {
+			product.MainImage = mainImage.String
+		}
+		if product.Stock < item.Quantity {
+			return nil, fmt.Errorf("商品「%s」库存不足", product.Name)
+		}
+
+		price := product.Price
+		specName := ""
+		if item.SpecID != nil {
+			var adj sql.NullFloat64
+			var sn sql.NullString
+			db.QueryRow("SELECT name, price_adjustment FROM product_specs WHERE id = ? AND product_id = ?",
+				*item.SpecID, item.ProductID).Scan(&sn, &adj)
+			if sn.Valid {
+				specName = sn.String
+			}
+			if adj.Valid {
+				price += adj.Float64
+			}
+		}
+
+		itemTotal := price * float64(item.Quantity)
+		totalPrice += itemTotal
+
+		orderItems = append(orderItems, model.OrderItem{
+			ProductID:    item.ProductID,
+			SpecID:       item.SpecID,
+			ProductName:  product.Name,
+			ProductImage: product.MainImage,
+			SpecName:     specName,
+			Price:        price,
+			Quantity:     item.Quantity,
+		})
+	}
+
+	result, err := db.Exec(`
+		INSERT INTO orders (user_id, order_no, total_price, pay_price, freight, status, pay_status,
+			address_name, address_phone, address_province, address_city, address_district, address_detail,
+			remark, order_source)
+		VALUES (?, ?, ?, ?, 0, 'pending', 'unpaid', ?, ?, ?, ?, ?, ?, ?, 'web')`,
+		userID, orderNo, totalPrice, totalPrice,
+		req.AddressName, req.AddressPhone, req.AddressProvince, req.AddressCity,
+		req.AddressDistrict, req.AddressDetail, req.Remark)
+	if err != nil {
+		return nil, err
+	}
+
+	orderID, _ := result.LastInsertId()
+
+	for _, oi := range orderItems {
+		db.Exec(`INSERT INTO order_items (order_id, product_id, spec_id, product_name, product_image, spec_name, price, quantity)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			orderID, oi.ProductID, oi.SpecID, oi.ProductName, oi.ProductImage, oi.SpecName, oi.Price, oi.Quantity)
+
+		s.productService.UpdateStock(oi.ProductID, -oi.Quantity, orderNo)
+	}
+
+	return s.GetOrderByID(orderID, userID)
+}

@@ -63,6 +63,7 @@ export const orderAPI = {
   list: (params) => api.get('/orders', { params }),
   get: (id) => api.get(`/orders/${id}`),
   create: (data) => api.post('/orders', data),
+  createAdmin: (data) => api.post('/orders/admin', data),
   updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   cancel: (id) => api.post(`/orders/${id}/cancel`),
   pay: (id, data) => api.post(`/orders/${id}/pay`, data),

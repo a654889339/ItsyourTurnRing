@@ -15,6 +15,10 @@
           <span class="nav-icon">💍</span>
           <span>商品管理</span>
         </router-link>
+        <router-link to="/create-order" class="nav-item" :class="{ active: $route.path === '/create-order' }">
+          <span class="nav-icon">🛒</span>
+          <span>快速下单</span>
+        </router-link>
         <router-link to="/orders" class="nav-item" :class="{ active: $route.path === '/orders' }">
           <span class="nav-icon">📦</span>
           <span>订单管理</span>

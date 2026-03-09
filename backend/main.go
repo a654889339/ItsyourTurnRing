@@ -99,6 +99,7 @@ func setupRoutes(mux *http.ServeMux) {
 
 	// 订单
 	mux.HandleFunc("/api/v1/orders", authMiddleware(handleOrders))
+	mux.HandleFunc("/api/v1/orders/admin", authMiddleware(handleAdminOrder))
 	mux.HandleFunc("/api/v1/orders/", authMiddleware(handleOrderByID))
 
 	// 收藏
@@ -547,6 +548,26 @@ func handleAddressByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// 管理员快速下单
+func handleAdminOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID := getUserID(r)
+	var req model.AdminOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	order, err := orderService.CreateAdminOrder(userID, &req)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonResponse(w, order)
 }
 
 // 订单处理器
