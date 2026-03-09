@@ -697,6 +697,23 @@ func handleOrderByID(w http.ResponseWriter, r *http.Request) {
 				jsonResponse(w, logs)
 				return
 			}
+		case "items":
+			if r.Method == "PUT" && len(pathParts) > 2 {
+				itemID, _ := strconv.ParseInt(pathParts[2], 10, 64)
+				var req struct {
+					Quantity int `json:"quantity"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					jsonError(w, "Invalid request", http.StatusBadRequest)
+					return
+				}
+				if err := orderService.AdminUpdateItemQuantity(orderID, itemID, req.Quantity); err != nil {
+					jsonError(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				jsonResponse(w, nil)
+				return
+			}
 		}
 	}
 

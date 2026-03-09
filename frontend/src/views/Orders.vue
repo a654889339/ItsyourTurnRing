@@ -175,7 +175,15 @@
                 <div class="detail-item-name">{{ item.product_name }}</div>
                 <div class="detail-item-spec" v-if="item.spec_name">{{ item.spec_name }}</div>
               </div>
-              <div class="detail-item-price">¥{{ item.price.toFixed(2) }} x {{ item.quantity }}</div>
+              <div class="detail-item-qty-edit">
+                <span class="detail-item-unit-price">¥{{ item.price.toFixed(2) }} ×</span>
+                <div class="qty-edit-group">
+                  <button class="qty-edit-btn" @click="changeItemQty(item, -1)" :disabled="item._saving">−</button>
+                  <span class="qty-edit-val">{{ item.quantity }}</span>
+                  <button class="qty-edit-btn" @click="changeItemQty(item, 1)" :disabled="item._saving">+</button>
+                </div>
+              </div>
+              <div class="detail-item-subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
             </div>
           </div>
 
@@ -304,6 +312,11 @@
                     <span class="old-price">¥{{ log.old_value }}</span>
                     <span class="log-arrow">→</span>
                     <span class="new-price">¥{{ log.new_value }}</span>
+                  </template>
+                  <template v-else-if="log.change_type === 'quantity'">
+                    <span class="old-price">{{ log.old_value }}</span>
+                    <span class="log-arrow">→</span>
+                    <span class="new-price">{{ log.new_value }}</span>
                   </template>
                   <template v-else-if="log.change_type === 'remark'">
                     <div v-if="log.old_value" class="remark-change">
@@ -499,14 +512,40 @@ const confirmUpdateRemark = async () => {
   }
 }
 
+// ---- 数量修改 ----
+const changeItemQty = async (item, delta) => {
+  const newQty = item.quantity + delta
+  if (newQty < 0) return
+  if (newQty === 0 && !confirm(`确认删除「${item.product_name}」？`)) return
+
+  item._saving = true
+  try {
+    await orderAPI.updateItemQuantity(currentOrder.value.id, item.id, newQty)
+    if (newQty === 0) {
+      const idx = currentOrder.value.items.findIndex(i => i.id === item.id)
+      if (idx >= 0) currentOrder.value.items.splice(idx, 1)
+    } else {
+      item.quantity = newQty
+    }
+    // 重算本地显示总价
+    const newTotal = currentOrder.value.items.reduce((s, i) => s + i.price * i.quantity, 0)
+    currentOrder.value.pay_price = newTotal
+    currentOrder.value.total_price = newTotal
+  } catch (err) {
+    alert('修改失败: ' + err.message)
+  } finally {
+    item._saving = false
+  }
+}
+
 // ---- 历史记录 ----
 const getLogIcon = (type) => {
-  const icons = { status: '🔄', price: '💰', remark: '📝' }
+  const icons = { status: '🔄', price: '💰', remark: '📝', quantity: '📦' }
   return icons[type] || '📋'
 }
 
 const getLogTypeLabel = (type) => {
-  const labels = { status: '状态变更', price: '金额修改', remark: '备注修改' }
+  const labels = { status: '状态变更', price: '金额修改', remark: '备注修改', quantity: '数量修改' }
   return labels[type] || type
 }
 
@@ -628,10 +667,23 @@ onMounted(() => {
 .order-detail-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
 .order-detail-item:last-child { border-bottom: none; }
 .detail-item-image { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
-.detail-item-info { flex: 1; margin-left: 12px; }
-.detail-item-name { font-weight: 500; }
+.detail-item-info { flex: 1; margin-left: 12px; min-width: 0; }
+.detail-item-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-item-spec { font-size: 12px; color: var(--text-secondary); }
-.detail-item-price { font-weight: 500; }
+
+.detail-item-qty-edit { display: flex; align-items: center; gap: 6px; margin: 0 8px; }
+.detail-item-unit-price { font-size: 13px; color: #666; white-space: nowrap; }
+.qty-edit-group { display: inline-flex; align-items: center; gap: 2px; }
+.qty-edit-btn {
+  width: 22px; height: 22px; border: 1px solid #ddd; border-radius: 4px;
+  background: #fff; cursor: pointer; font-size: 13px; display: flex;
+  align-items: center; justify-content: center; color: #555;
+  transition: all 0.15s;
+}
+.qty-edit-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.qty-edit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.qty-edit-val { width: 26px; text-align: center; font-size: 13px; font-weight: 600; }
+.detail-item-subtotal { font-weight: 600; color: var(--primary-color); min-width: 70px; text-align: right; }
 
 /* 价格/备注弹窗 */
 .current-val {
@@ -671,6 +723,7 @@ onMounted(() => {
 .log-type-status { background: #e3f2fd; }
 .log-type-price { background: #fff8e1; }
 .log-type-remark { background: #f3e5f5; }
+.log-type-quantity { background: #e8f5e9; }
 
 .log-content { flex: 1; min-width: 0; }
 .log-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }

@@ -692,6 +692,53 @@ func (s *OrderService) GetOrderChangeLogs(orderID int64) ([]model.OrderChangeLog
 	return logs, nil
 }
 
+// AdminUpdateItemQuantity 管理员修改订单项数量（带日志，自动重算总价）
+func (s *OrderService) AdminUpdateItemQuantity(orderID int64, itemID int64, newQty int) error {
+	db := database.GetDB()
+
+	if newQty < 0 {
+		return errors.New("数量不能为负数")
+	}
+
+	var oldQty int
+	var productName string
+	var price float64
+	err := db.QueryRow("SELECT quantity, product_name, price FROM order_items WHERE id = ? AND order_id = ?",
+		itemID, orderID).Scan(&oldQty, &productName, &price)
+	if err != nil {
+		return errors.New("订单项不存在")
+	}
+
+	if oldQty == newQty {
+		return nil
+	}
+
+	if newQty == 0 {
+		_, err = db.Exec("DELETE FROM order_items WHERE id = ? AND order_id = ?", itemID, orderID)
+	} else {
+		_, err = db.Exec("UPDATE order_items SET quantity = ? WHERE id = ? AND order_id = ?", newQty, itemID, orderID)
+	}
+	if err != nil {
+		return err
+	}
+
+	// 重算订单总价
+	var total sql.NullFloat64
+	db.QueryRow("SELECT SUM(price * quantity) FROM order_items WHERE order_id = ?", orderID).Scan(&total)
+	newTotal := 0.0
+	if total.Valid {
+		newTotal = total.Float64
+	}
+	db.Exec("UPDATE orders SET total_price = ?, pay_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		newTotal, newTotal, orderID)
+
+	s.logChange(orderID, "quantity",
+		fmt.Sprintf("%s: %d件", productName, oldQty),
+		fmt.Sprintf("%s: %d件", productName, newQty),
+		"admin")
+	return nil
+}
+
 func (s *OrderService) logChange(orderID int64, changeType, oldVal, newVal, operator string) {
 	db := database.GetDB()
 	db.Exec(`INSERT INTO order_change_logs (order_id, change_type, old_value, new_value, operator) VALUES (?, ?, ?, ?, ?)`,
