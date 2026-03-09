@@ -17,7 +17,7 @@ App({
       } catch (e) {}
     }
     if (!token) {
-      this.alipayLogin()
+      this.alipayLogin(false)
     }
   },
 
@@ -84,7 +84,7 @@ App({
     return !!this.globalData.token
   },
 
-  alipayLogin() {
+  alipayLogin(showError) {
     return new Promise((resolve, reject) => {
       my.getAuthCode({
         scopes: 'auth_user',
@@ -100,10 +100,16 @@ App({
             resolve(data)
           }).catch(err => {
             console.error('支付宝登录失败', err)
+            if (showError) {
+              my.showToast({ content: '登录失败' })
+            }
             reject(err)
           })
         },
-        fail: reject
+        fail: (err) => {
+          console.error('获取authCode失败', err)
+          reject(err)
+        }
       })
     })
   },

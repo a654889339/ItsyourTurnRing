@@ -15,7 +15,7 @@ App({
       this.globalData.userInfo = userInfo
     }
     if (!token) {
-      this.wxLogin()
+      this.wxLogin(false)
     }
   },
 
@@ -82,7 +82,7 @@ App({
     return !!this.globalData.token
   },
 
-  wxLogin() {
+  wxLogin(showError) {
     return new Promise((resolve, reject) => {
       wx.login({
         success: (res) => {
@@ -98,6 +98,9 @@ App({
               resolve(data)
             }).catch(err => {
               console.error('微信登录失败', err)
+              if (showError) {
+                wx.showToast({ title: '登录失败', icon: 'none' })
+              }
               reject(err)
             })
           } else {

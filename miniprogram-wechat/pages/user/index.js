@@ -37,7 +37,7 @@ Page({
   },
 
   onLogin() {
-    app.wxLogin().then(() => {
+    app.wxLogin(true).then(() => {
       this.checkLoginStatus()
     }).catch(err => {
       console.error('登录失败', err)
@@ -45,15 +45,39 @@ Page({
   },
 
   onChooseAvatar(e) {
-    const avatarUrl = e.detail.avatarUrl
-    if (!avatarUrl) return
+    const tempUrl = e.detail.avatarUrl
+    if (!tempUrl) return
 
-    this.setData({ avatarUrl })
+    this.setData({ avatarUrl: tempUrl })
 
-    app.updateProfile(this.data.nickname, avatarUrl).then(() => {
-      wx.showToast({ title: '头像已更新', icon: 'success' })
-    }).catch(err => {
-      console.error('更新头像失败', err)
+    wx.uploadFile({
+      url: app.globalData.apiBase + '/upload/image',
+      filePath: tempUrl,
+      name: 'file',
+      header: {
+        'Authorization': app.globalData.token ? `Bearer ${app.globalData.token}` : ''
+      },
+      success: (uploadRes) => {
+        try {
+          const data = JSON.parse(uploadRes.data)
+          if (data.code === 0 && data.data && data.data.url) {
+            const imageUrl = data.data.url
+            this.setData({ avatarUrl: imageUrl })
+            app.updateProfile(this.data.nickname, imageUrl).then(() => {
+              wx.showToast({ title: '头像已更新', icon: 'success' })
+            })
+          } else {
+            wx.showToast({ title: '上传失败', icon: 'none' })
+          }
+        } catch (err) {
+          console.error('解析上传结果失败', err)
+          wx.showToast({ title: '上传失败', icon: 'none' })
+        }
+      },
+      fail: (err) => {
+        console.error('上传头像失败', err)
+        wx.showToast({ title: '上传失败', icon: 'none' })
+      }
     })
   },
 

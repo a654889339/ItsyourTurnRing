@@ -1,13 +1,23 @@
 package service
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -16,6 +26,8 @@ import (
 	"itsyourturnring/database"
 	"itsyourturnring/model"
 )
+
+var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 type AuthService struct{}
 
@@ -27,7 +39,6 @@ func NewAuthService() *AuthService {
 func (s *AuthService) Register(req *model.RegisterRequest) (*model.TokenResponse, error) {
 	db := database.GetDB()
 
-	// 检查用户名是否已存在
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", req.Username).Scan(&count)
 	if err != nil {
@@ -37,7 +48,6 @@ func (s *AuthService) Register(req *model.RegisterRequest) (*model.TokenResponse
 		return nil, errors.New("用户名已存在")
 	}
 
-	// 检查邮箱是否已存在
 	if req.Email != "" {
 		err = db.QueryRow("SELECT COUNT(*) FROM users WHERE email = ?", req.Email).Scan(&count)
 		if err != nil {
@@ -48,13 +58,11 @@ func (s *AuthService) Register(req *model.RegisterRequest) (*model.TokenResponse
 		}
 	}
 
-	// 密码加密
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	// 插入用户
 	result, err := db.Exec(`
 		INSERT INTO users (username, password, email, phone, role)
 		VALUES (?, ?, ?, ?, 'user')`,
@@ -65,13 +73,11 @@ func (s *AuthService) Register(req *model.RegisterRequest) (*model.TokenResponse
 
 	userID, _ := result.LastInsertId()
 
-	// 获取用户信息
 	user, err := s.GetUserByID(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 生成Token
 	token, err := s.GenerateToken(user)
 	if err != nil {
 		return nil, err
@@ -204,7 +210,9 @@ func (s *AuthService) ChangePassword(userID int64, oldPassword, newPassword stri
 	return err
 }
 
-// WechatLogin 微信小程序登录 - 用code换取openid，然后查找或创建用户
+// ==================== 微信登录 ====================
+
+// WechatLogin 微信小程序登录
 func (s *AuthService) WechatLogin(code string) (*model.TokenResponse, error) {
 	cfg := config.GetConfig()
 	if cfg.WechatMP.AppID == "" || cfg.WechatMP.AppSecret == "" {
@@ -230,17 +238,21 @@ func (s *AuthService) WechatLogin(code string) (*model.TokenResponse, error) {
 }
 
 func (s *AuthService) getWechatOpenID(appID, appSecret, code string) (string, error) {
-	url := fmt.Sprintf(
+	reqURL := fmt.Sprintf(
 		"https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code",
 		appID, appSecret, code)
 
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(reqURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("请求微信API失败: %w", err)
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取微信响应失败: %w", err)
+	}
+
 	var result struct {
 		OpenID     string `json:"openid"`
 		SessionKey string `json:"session_key"`
@@ -248,13 +260,13 @@ func (s *AuthService) getWechatOpenID(appID, appSecret, code string) (string, er
 		ErrMsg     string `json:"errmsg"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", err
+		return "", fmt.Errorf("解析微信响应失败: %w", err)
 	}
 	if result.ErrCode != 0 {
-		return "", fmt.Errorf("wechat error: %d %s", result.ErrCode, result.ErrMsg)
+		return "", fmt.Errorf("微信API错误: %d %s", result.ErrCode, result.ErrMsg)
 	}
 	if result.OpenID == "" {
-		return "", errors.New("empty openid")
+		return "", errors.New("微信返回空openid")
 	}
 	return result.OpenID, nil
 }
@@ -278,31 +290,33 @@ func (s *AuthService) findOrCreateByWechat(openid string) (*model.User, error) {
 		return nil, err
 	}
 
-	username := "wx_" + openid[:8]
+	username := safeUsername("wx", openid)
 	dummyPwd, _ := bcrypt.GenerateFromPassword([]byte(openid), bcrypt.DefaultCost)
 	result, err := db.Exec(`
 		INSERT INTO users (username, password, nickname, wechat_openid, role)
 		VALUES (?, ?, ?, ?, 'user')`, username, string(dummyPwd), "", openid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("创建微信用户失败: %w", err)
 	}
 	userID, _ := result.LastInsertId()
 	return s.GetUserByID(userID)
 }
 
-// AlipayLogin 支付宝小程序登录 - 用authCode换取user_id，然后查找或创建用户
+// ==================== 支付宝登录 ====================
+
+// AlipayLogin 支付宝小程序登录
 func (s *AuthService) AlipayLogin(authCode string) (*model.TokenResponse, error) {
 	cfg := config.GetConfig()
 	if cfg.AlipayMP.AppID == "" {
 		return nil, errors.New("支付宝小程序未配置")
 	}
 
-	userID, nickname, avatar, err := s.getAlipayUserInfo(authCode)
+	alipayUID, err := s.getAlipayUserID(cfg, authCode)
 	if err != nil {
 		return nil, fmt.Errorf("获取支付宝用户信息失败: %w", err)
 	}
 
-	user, err := s.findOrCreateByAlipay(userID, nickname, avatar)
+	user, err := s.findOrCreateByAlipay(alipayUID)
 	if err != nil {
 		return nil, err
 	}
@@ -315,25 +329,143 @@ func (s *AuthService) AlipayLogin(authCode string) (*model.TokenResponse, error)
 	return &model.TokenResponse{Token: token, User: user}, nil
 }
 
-func (s *AuthService) getAlipayUserInfo(authCode string) (userID, nickname, avatar string, err error) {
-	// 支付宝小程序通过 my.getAuthCode(scopes:'auth_user') 获取 authCode
-	// 后端用 authCode 换 access_token, 再用 access_token 获取用户信息
-	// 简化实现: 将 authCode 作为唯一标识（真实环境需调用支付宝 open API）
-	cfg := config.GetConfig()
-	_ = cfg
-
-	// 第1步: 换取 access_token
-	// 在真实环境中需要签名调用支付宝 API
-	// 此处简化: 直接使用 authCode 作为 user_id 标识
-	log.Printf("AlipayLogin: authCode=%s, appID=%s", authCode, cfg.AlipayMP.AppID)
-	userID = "alipay_" + authCode
-	if len(userID) > 32 {
-		userID = userID[:32]
+func (s *AuthService) getAlipayUserID(cfg *config.Config, authCode string) (string, error) {
+	if cfg.AlipayMP.PrivateKey == "" {
+		return "", errors.New("支付宝私钥未配置，无法完成登录")
 	}
-	return userID, "", "", nil
+
+	params := map[string]string{
+		"app_id":     cfg.AlipayMP.AppID,
+		"method":     "alipay.system.oauth.token",
+		"format":     "JSON",
+		"charset":    "utf-8",
+		"sign_type":  "RSA2",
+		"timestamp":  time.Now().Format("2006-01-02 15:04:05"),
+		"version":    "1.0",
+		"grant_type": "authorization_code",
+		"code":       authCode,
+	}
+
+	signStr := buildAlipaySignString(params)
+	sign, err := rsaSignSHA256(signStr, cfg.AlipayMP.PrivateKey)
+	if err != nil {
+		return "", fmt.Errorf("支付宝签名失败: %w", err)
+	}
+	params["sign"] = sign
+
+	formValues := url.Values{}
+	for k, v := range params {
+		formValues.Set(k, v)
+	}
+
+	resp, err := httpClient.PostForm("https://openapi.alipay.com/gateway.do", formValues)
+	if err != nil {
+		return "", fmt.Errorf("请求支付宝API失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取支付宝响应失败: %w", err)
+	}
+
+	var result struct {
+		Response struct {
+			UserID      string `json:"user_id"`
+			AccessToken string `json:"access_token"`
+			Code        string `json:"code"`
+			Msg         string `json:"msg"`
+			SubCode     string `json:"sub_code"`
+			SubMsg      string `json:"sub_msg"`
+		} `json:"alipay_system_oauth_token_response"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("解析支付宝响应失败: %w", err)
+	}
+
+	if result.Response.Code != "" && result.Response.Code != "10000" {
+		log.Printf("支付宝OAuth失败: code=%s, subCode=%s, subMsg=%s",
+			result.Response.Code, result.Response.SubCode, result.Response.SubMsg)
+		return "", fmt.Errorf("支付宝授权失败: %s", result.Response.SubMsg)
+	}
+
+	if result.Response.UserID == "" {
+		return "", errors.New("支付宝返回空user_id")
+	}
+
+	return result.Response.UserID, nil
 }
 
-func (s *AuthService) findOrCreateByAlipay(alipayUID, nickname, avatar string) (*model.User, error) {
+func buildAlipaySignString(params map[string]string) string {
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		if k == "sign" {
+			continue
+		}
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if params[k] != "" {
+			parts = append(parts, k+"="+params[k])
+		}
+	}
+	return strings.Join(parts, "&")
+}
+
+func rsaSignSHA256(content, privateKeyStr string) (string, error) {
+	privateKeyStr = strings.ReplaceAll(privateKeyStr, "-----BEGIN RSA PRIVATE KEY-----", "")
+	privateKeyStr = strings.ReplaceAll(privateKeyStr, "-----END RSA PRIVATE KEY-----", "")
+	privateKeyStr = strings.ReplaceAll(privateKeyStr, "-----BEGIN PRIVATE KEY-----", "")
+	privateKeyStr = strings.ReplaceAll(privateKeyStr, "-----END PRIVATE KEY-----", "")
+	privateKeyStr = strings.ReplaceAll(privateKeyStr, "\n", "")
+	privateKeyStr = strings.ReplaceAll(privateKeyStr, "\r", "")
+	privateKeyStr = strings.TrimSpace(privateKeyStr)
+
+	keyBytes, err := base64.StdEncoding.DecodeString(privateKeyStr)
+	if err != nil {
+		return "", fmt.Errorf("base64解码私钥失败: %w", err)
+	}
+
+	var privateKey *rsa.PrivateKey
+
+	// 尝试 PEM 解码
+	if block, _ := pem.Decode([]byte("-----BEGIN PRIVATE KEY-----\n" + privateKeyStr + "\n-----END PRIVATE KEY-----")); block != nil {
+		keyBytes = block.Bytes
+	}
+
+	// 先尝试 PKCS8 格式
+	key, err := x509.ParsePKCS8PrivateKey(keyBytes)
+	if err != nil {
+		// 再尝试 PKCS1 格式
+		privateKey, err = x509.ParsePKCS1PrivateKey(keyBytes)
+		if err != nil {
+			return "", fmt.Errorf("解析私钥失败(PKCS1/PKCS8均不匹配): %w", err)
+		}
+	} else {
+		var ok bool
+		privateKey, ok = key.(*rsa.PrivateKey)
+		if !ok {
+			return "", errors.New("私钥类型不是RSA")
+		}
+	}
+
+	h := sha256.New()
+	h.Write([]byte(content))
+	hashed := h.Sum(nil)
+
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashed)
+	if err != nil {
+		return "", fmt.Errorf("RSA签名失败: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(signature), nil
+}
+
+func (s *AuthService) findOrCreateByAlipay(alipayUID string) (*model.User, error) {
 	db := database.GetDB()
 
 	var user model.User
@@ -346,42 +478,53 @@ func (s *AuthService) findOrCreateByAlipay(alipayUID, nickname, avatar string) (
 	if err == nil {
 		user.Nickname = nick.String
 		user.AlipayUserID = alipayUID
-		if nickname != "" && user.Nickname == "" {
-			db.Exec("UPDATE users SET nickname = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", nickname, user.ID)
-			user.Nickname = nickname
-		}
-		if avatar != "" && !user.Avatar.Valid {
-			db.Exec("UPDATE users SET avatar = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", avatar, user.ID)
-			user.Avatar = sql.NullString{String: avatar, Valid: true}
-		}
 		return &user, nil
 	}
 	if err != sql.ErrNoRows {
 		return nil, err
 	}
 
-	username := "ali_" + alipayUID[:8]
+	username := safeUsername("ali", alipayUID)
 	dummyPwd, _ := bcrypt.GenerateFromPassword([]byte(alipayUID), bcrypt.DefaultCost)
 	result, err := db.Exec(`
-		INSERT INTO users (username, password, nickname, avatar, alipay_userid, role)
-		VALUES (?, ?, ?, ?, ?, 'user')`, username, string(dummyPwd), nickname, avatar, alipayUID)
+		INSERT INTO users (username, password, nickname, alipay_userid, role)
+		VALUES (?, ?, ?, ?, 'user')`, username, string(dummyPwd), "", alipayUID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("创建支付宝用户失败: %w", err)
 	}
 	id, _ := result.LastInsertId()
 	return s.GetUserByID(id)
 }
+
+// ==================== 更新用户资料 ====================
 
 // UpdateProfile 更新用户昵称和头像
 func (s *AuthService) UpdateProfile(userID int64, nickname, avatar string) (*model.User, error) {
 	db := database.GetDB()
 
 	if nickname != "" {
-		db.Exec("UPDATE users SET nickname = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", nickname, userID)
+		if _, err := db.Exec("UPDATE users SET nickname = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+			nickname, userID); err != nil {
+			return nil, fmt.Errorf("更新昵称失败: %w", err)
+		}
 	}
 	if avatar != "" {
-		db.Exec("UPDATE users SET avatar = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", avatar, userID)
+		if _, err := db.Exec("UPDATE users SET avatar = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+			avatar, userID); err != nil {
+			return nil, fmt.Errorf("更新头像失败: %w", err)
+		}
 	}
 
 	return s.GetUserByID(userID)
+}
+
+// ==================== 辅助函数 ====================
+
+// safeUsername 生成安全的用户名，使用完整标识符避免碰撞，截断到50字符
+func safeUsername(prefix, identifier string) string {
+	username := prefix + "_" + identifier
+	if len(username) > 50 {
+		username = username[:50]
+	}
+	return username
 }

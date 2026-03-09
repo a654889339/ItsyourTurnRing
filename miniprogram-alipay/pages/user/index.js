@@ -37,7 +37,7 @@ Page({
   },
 
   onLogin() {
-    app.alipayLogin().then(() => {
+    app.alipayLogin(true).then(() => {
       this.checkLoginStatus()
     }).catch(err => {
       console.error('登录失败', err)
