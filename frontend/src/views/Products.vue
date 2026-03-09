@@ -69,6 +69,7 @@
             <td>
               <div class="action-btns">
                 <button class="btn btn-small btn-secondary" @click="openEditModal(product)">编辑</button>
+                <button class="btn btn-small btn-secondary" @click="showChangeLogs(product)" title="变更记录">历史</button>
                 <button class="btn btn-small btn-secondary" @click="toggleStatus(product)">
                   {{ product.status === 'available' ? '下架' : '上架' }}
                 </button>
@@ -233,6 +234,38 @@
           <button class="btn btn-primary" @click="saveProduct" :disabled="saving || uploading.image || uploading.video">
             {{ saving ? '保存中...' : '保存' }}
           </button>
+        </div>
+      </div>
+    </div>
+    <!-- 变更记录弹窗 -->
+    <div v-if="showLogsModal" class="modal-overlay" @click.self="showLogsModal = false">
+      <div class="modal" style="max-width: 540px">
+        <div class="modal-header">
+          <h3 class="modal-title">{{ logsProductName }} - 变更记录</h3>
+          <button class="modal-close" @click="showLogsModal = false">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height: 500px; overflow-y: auto; padding: 0;">
+          <div v-if="logsLoading" class="empty-state" style="padding: 40px;">加载中...</div>
+          <div v-else-if="changeLogs.length === 0" class="empty-state" style="padding: 40px;">暂无变更记录</div>
+          <div v-else class="logs-list">
+            <div v-for="log in changeLogs" :key="log.id" class="log-item">
+              <div class="log-header">
+                <span class="log-type" :class="'log-type-' + log.change_type">
+                  {{ logTypeLabel(log.change_type) }}
+                </span>
+                <span class="log-time">{{ formatLogTime(log.created_at) }}</span>
+              </div>
+              <div class="log-values">
+                <span class="log-old">{{ formatLogVal(log.change_type, log.old_value) }}</span>
+                <span class="log-arrow">&rarr;</span>
+                <span class="log-new">{{ formatLogVal(log.change_type, log.new_value) }}</span>
+              </div>
+              <div class="log-meta">
+                <span class="log-remark" v-if="log.remark">{{ log.remark }}</span>
+                <span class="log-order" v-if="log.order_no">订单: {{ log.order_no }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -437,6 +470,42 @@ const confirmDelete = async (product) => {
   catch (error) { alert(error.message) }
 }
 
+// 变更记录
+const showLogsModal = ref(false)
+const logsLoading = ref(false)
+const changeLogs = ref([])
+const logsProductName = ref('')
+
+async function showChangeLogs(product) {
+  logsProductName.value = product.name
+  showLogsModal.value = true
+  logsLoading.value = true
+  changeLogs.value = []
+  try {
+    const res = await productAPI.getChangeLogs(product.id)
+    changeLogs.value = res || []
+  } catch (err) {
+    console.error('获取变更记录失败:', err)
+  } finally {
+    logsLoading.value = false
+  }
+}
+
+function logTypeLabel(type) {
+  return { stock: '库存', price: '价格', status: '状态' }[type] || type
+}
+
+function formatLogVal(type, val) {
+  if (type === 'price') return '¥' + parseFloat(val || 0).toFixed(2)
+  if (type === 'stock') return val + ' 件'
+  return val
+}
+
+function formatLogTime(t) {
+  if (!t) return ''
+  return new Date(t).toLocaleString('zh-CN')
+}
+
 let searchTimer = null
 const debouncedSearch = () => {
   clearTimeout(searchTimer)
@@ -506,4 +575,31 @@ onMounted(() => { fetchCategories(); fetchProducts() })
 }
 .video-player { width: 100%; max-height: 160px; display: block; }
 .video-preview .upload-remove { top: 4px; right: 4px; }
+
+/* Change logs */
+.logs-list { padding: 0; }
+.log-item {
+  padding: 14px 20px; border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s;
+}
+.log-item:hover { background: #fafafa; }
+.log-item:last-child { border-bottom: none; }
+.log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.log-type {
+  display: inline-block; padding: 2px 10px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.log-type-stock { background: #e6f7ff; color: #096dd9; }
+.log-type-price { background: #fff7e6; color: #d48806; }
+.log-type-status { background: #f6ffed; color: #389e0d; }
+.log-time { font-size: 12px; color: #bbb; }
+.log-values {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 500; margin-bottom: 4px;
+}
+.log-old { color: #999; text-decoration: line-through; }
+.log-arrow { color: #ccc; font-size: 13px; }
+.log-new { color: #333; }
+.log-meta { display: flex; gap: 12px; font-size: 12px; color: #999; }
+.log-order { color: var(--primary-color); }
 </style>
