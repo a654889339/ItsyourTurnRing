@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -22,33 +23,70 @@ func NewUploadService() *UploadService {
 	return &UploadService{}
 }
 
-// UploadImage 上传图片
-func (s *UploadService) UploadImage(file io.Reader, filename string, contentType string) (string, error) {
-	cfg := config.GetConfig()
+var imageExts = map[string]bool{
+	".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true,
+}
 
-	// 生成新文件名
-	ext := filepath.Ext(filename)
+var videoExts = map[string]bool{
+	".mp4": true, ".mov": true, ".avi": true, ".webm": true, ".mkv": true,
+}
+
+func (s *UploadService) UploadImage(file io.Reader, filename string, contentType string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
 	if ext == "" {
 		ext = s.getExtFromContentType(contentType)
 	}
+	if !imageExts[ext] {
+		return "", fmt.Errorf("不支持的图片格式，仅支持 jpg/png/gif/webp")
+	}
+	return s.upload(file, "ring/images/", ext)
+}
+
+func (s *UploadService) UploadVideo(file io.Reader, filename string, contentType string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext == "" {
+		ext = s.getExtFromVideoContentType(contentType)
+	}
+	if !videoExts[ext] {
+		return "", fmt.Errorf("不支持的视频格式，仅支持 mp4/mov/avi/webm/mkv")
+	}
+	return s.upload(file, "ring/videos/", ext)
+}
+
+// UploadFile 通用上传，自动判断图片或视频
+func (s *UploadService) UploadFile(file io.Reader, filename string, contentType string) (string, string, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext == "" {
+		ext = s.getExtFromContentType(contentType)
+	}
+
+	if imageExts[ext] {
+		u, err := s.upload(file, "ring/images/", ext)
+		return u, "image", err
+	}
+	if videoExts[ext] {
+		u, err := s.upload(file, "ring/videos/", ext)
+		return u, "video", err
+	}
+	return "", "", fmt.Errorf("不支持的文件格式: %s", ext)
+}
+
+func (s *UploadService) upload(file io.Reader, prefix string, ext string) (string, error) {
+	cfg := config.GetConfig()
 	newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
 
 	if cfg.TencentCloud.COS.Enabled {
-		return s.uploadToCOS(file, newFilename)
+		return s.uploadToCOS(file, prefix+newFilename)
 	}
-
 	return s.uploadToLocal(file, newFilename)
 }
 
-// UploadBase64Image 上传Base64图片
 func (s *UploadService) UploadBase64Image(base64Data string) (string, error) {
-	// 解析Base64数据
 	parts := strings.SplitN(base64Data, ",", 2)
 	var data string
 	var ext string
 
 	if len(parts) == 2 {
-		// 格式: data:image/jpeg;base64,xxxxx
 		meta := parts[0]
 		data = parts[1]
 		if strings.Contains(meta, "image/jpeg") {
@@ -67,43 +105,34 @@ func (s *UploadService) UploadBase64Image(base64Data string) (string, error) {
 		ext = ".jpg"
 	}
 
-	// 解码
 	decoded, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return "", fmt.Errorf("invalid base64 data: %v", err)
 	}
 
-	// 生成文件名
-	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-
 	cfg := config.GetConfig()
-	if cfg.TencentCloud.COS.Enabled {
-		return s.uploadToCOS(strings.NewReader(string(decoded)), filename)
-	}
+	newFilename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
 
-	return s.uploadToLocalBytes(decoded, filename)
+	if cfg.TencentCloud.COS.Enabled {
+		return s.uploadToCOS(bytes.NewReader(decoded), "ring/images/"+newFilename)
+	}
+	return s.uploadToLocalBytes(decoded, newFilename)
 }
 
 func (s *UploadService) uploadToLocal(file io.Reader, filename string) (string, error) {
-	// 确保目录存在
 	uploadDir := "./uploads"
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		return "", err
 	}
-
-	// 创建文件
 	filePath := filepath.Join(uploadDir, filename)
 	dst, err := os.Create(filePath)
 	if err != nil {
 		return "", err
 	}
 	defer dst.Close()
-
-	// 写入文件
 	if _, err := io.Copy(dst, file); err != nil {
 		return "", err
 	}
-
 	return "/uploads/" + filename, nil
 }
 
@@ -112,35 +141,27 @@ func (s *UploadService) uploadToLocalBytes(data []byte, filename string) (string
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		return "", err
 	}
-
 	filePath := filepath.Join(uploadDir, filename)
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		return "", err
 	}
-
 	return "/uploads/" + filename, nil
 }
 
-func (s *UploadService) uploadToCOS(file io.Reader, filename string) (string, error) {
+func (s *UploadService) uploadToCOS(file io.Reader, key string) (string, error) {
 	cfg := config.GetConfig()
-
-	// 创建COS客户端
 	u, _ := url.Parse(cfg.TencentCloud.COS.BaseURL)
-	b := &cos.BaseURL{BucketURL: u}
-	client := cos.NewClient(b, &http.Client{
+	client := cos.NewClient(&cos.BaseURL{BucketURL: u}, &http.Client{
 		Transport: &cos.AuthorizationTransport{
 			SecretID:  cfg.TencentCloud.COS.SecretID,
 			SecretKey: cfg.TencentCloud.COS.SecretKey,
 		},
 	})
 
-	// 上传文件
-	key := "ring/" + filename
 	_, err := client.Object.Put(context.Background(), key, file, nil)
 	if err != nil {
 		return "", err
 	}
-
 	return cfg.TencentCloud.COS.BaseURL + "/" + key, nil
 }
 
@@ -159,18 +180,29 @@ func (s *UploadService) getExtFromContentType(contentType string) string {
 	}
 }
 
-// DeleteImage 删除图片
+func (s *UploadService) getExtFromVideoContentType(contentType string) string {
+	switch contentType {
+	case "video/mp4":
+		return ".mp4"
+	case "video/quicktime":
+		return ".mov"
+	case "video/x-msvideo":
+		return ".avi"
+	case "video/webm":
+		return ".webm"
+	default:
+		return ".mp4"
+	}
+}
+
 func (s *UploadService) DeleteImage(imageURL string) error {
 	cfg := config.GetConfig()
-
 	if cfg.TencentCloud.COS.Enabled && strings.HasPrefix(imageURL, cfg.TencentCloud.COS.BaseURL) {
 		return s.deleteFromCOS(imageURL)
 	}
-
 	if strings.HasPrefix(imageURL, "/uploads/") {
 		return s.deleteFromLocal(imageURL)
 	}
-
 	return nil
 }
 
@@ -181,16 +213,13 @@ func (s *UploadService) deleteFromLocal(imageURL string) error {
 
 func (s *UploadService) deleteFromCOS(imageURL string) error {
 	cfg := config.GetConfig()
-
 	u, _ := url.Parse(cfg.TencentCloud.COS.BaseURL)
-	b := &cos.BaseURL{BucketURL: u}
-	client := cos.NewClient(b, &http.Client{
+	client := cos.NewClient(&cos.BaseURL{BucketURL: u}, &http.Client{
 		Transport: &cos.AuthorizationTransport{
 			SecretID:  cfg.TencentCloud.COS.SecretID,
 			SecretKey: cfg.TencentCloud.COS.SecretKey,
 		},
 	})
-
 	key := strings.TrimPrefix(imageURL, cfg.TencentCloud.COS.BaseURL+"/")
 	_, err := client.Object.Delete(context.Background(), key)
 	return err

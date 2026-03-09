@@ -42,6 +42,7 @@ type Product struct {
 	OriginalPrice float64   `json:"original_price"`
 	Images        string    `json:"images"`          // JSON数组
 	MainImage     string    `json:"main_image"`
+	Video         string    `json:"video"`           // 视频URL
 	Material      string    `json:"material"`        // 材质
 	Size          string    `json:"size"`            // 尺寸
 	Color         string    `json:"color"`           // 颜色
@@ -258,6 +259,7 @@ type ProductCreateRequest struct {
 	OriginalPrice float64 `json:"original_price"`
 	Images        string  `json:"images"`
 	MainImage     string  `json:"main_image"`
+	Video         string  `json:"video"`
 	Material      string  `json:"material"`
 	Size          string  `json:"size"`
 	Color         string  `json:"color"`

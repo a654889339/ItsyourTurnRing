@@ -47,6 +47,10 @@
                 <div class="product-info">
                   <div class="product-name">{{ product.name }}</div>
                   <div class="product-material" v-if="product.material">{{ product.material }}</div>
+                  <div class="product-media-count">
+                    <span v-if="getImageCount(product)">{{ getImageCount(product) }}张图</span>
+                    <span v-if="product.video" class="has-video">有视频</span>
+                  </div>
                 </div>
               </div>
             </td>
@@ -75,9 +79,7 @@
         </tbody>
       </table>
 
-      <div v-if="products.length === 0" class="empty-state">
-        暂无商品
-      </div>
+      <div v-if="products.length === 0" class="empty-state">暂无商品</div>
 
       <div class="pagination" v-if="total > pageSize">
         <button class="pagination-btn" :disabled="page === 1" @click="page--; fetchProducts()">上一页</button>
@@ -88,7 +90,7 @@
 
     <!-- 商品表单弹窗 -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal" style="max-width: 700px">
+      <div class="modal" style="max-width: 720px">
         <div class="modal-header">
           <h3 class="modal-title">{{ isEdit ? '编辑商品' : '添加商品' }}</h3>
           <button class="modal-close" @click="closeModal">&times;</button>
@@ -142,17 +144,76 @@
             </div>
           </div>
 
+          <!-- 多图上传 -->
           <div class="form-group">
-            <label class="form-label">商品图片</label>
-            <div class="image-upload">
-              <input type="file" accept="image/*" @change="handleImageUpload" ref="fileInput" style="display: none" />
-              <div class="image-preview" v-if="form.main_image">
-                <img :src="form.main_image" class="preview-img" />
-                <button class="remove-image" @click="form.main_image = ''">&times;</button>
+            <label class="form-label">商品图片 <span class="form-hint-inline">(最多9张，第一张为主图)</span></label>
+            <div class="multi-upload">
+              <div class="upload-grid">
+                <div
+                  v-for="(img, idx) in imageList"
+                  :key="idx"
+                  class="upload-item"
+                  :class="{ 'is-main': idx === 0 }"
+                  draggable="true"
+                  @dragstart="dragStart(idx)"
+                  @dragover.prevent
+                  @drop="dragDrop(idx)"
+                >
+                  <img :src="img" class="upload-thumb" />
+                  <button class="upload-remove" @click="removeImage(idx)">&times;</button>
+                  <span v-if="idx === 0" class="main-badge">主图</span>
+                </div>
+                <div
+                  v-if="imageList.length < 9"
+                  class="upload-add"
+                  @click="$refs.imageInput.click()"
+                >
+                  <span class="upload-add-icon">+</span>
+                  <span class="upload-add-text">添加图片</span>
+                </div>
               </div>
-              <button class="btn btn-secondary" @click="$refs.fileInput.click()">
-                {{ form.main_image ? '更换图片' : '上传图片' }}
+              <input
+                ref="imageInput"
+                type="file"
+                accept="image/*"
+                multiple
+                style="display: none"
+                @change="handleMultiImageUpload"
+              />
+              <p class="form-hint" v-if="uploading.image">正在上传图片...</p>
+            </div>
+          </div>
+
+          <!-- 视频上传 -->
+          <div class="form-group">
+            <label class="form-label">商品视频 <span class="form-hint-inline">(最大50MB，可选)</span></label>
+            <div class="video-upload">
+              <div v-if="form.video" class="video-preview">
+                <video :src="form.video" controls class="video-player"></video>
+                <button class="upload-remove" @click="form.video = ''">&times;</button>
+              </div>
+              <button
+                v-if="!form.video"
+                class="btn btn-secondary"
+                @click="$refs.videoInput.click()"
+                :disabled="uploading.video"
+              >
+                {{ uploading.video ? '上传中...' : '上传视频' }}
               </button>
+              <button
+                v-if="form.video"
+                class="btn btn-secondary btn-small"
+                @click="$refs.videoInput.click()"
+              >
+                更换视频
+              </button>
+              <input
+                ref="videoInput"
+                type="file"
+                accept="video/*"
+                style="display: none"
+                @change="handleVideoUpload"
+              />
             </div>
           </div>
 
@@ -169,7 +230,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeModal">取消</button>
-          <button class="btn btn-primary" @click="saveProduct" :disabled="saving">
+          <button class="btn btn-primary" @click="saveProduct" :disabled="saving || uploading.image || uploading.video">
             {{ saving ? '保存中...' : '保存' }}
           </button>
         </div>
@@ -188,16 +249,15 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 20
 
-const filter = reactive({
-  keyword: '',
-  category: '',
-  status: ''
-})
+const filter = reactive({ keyword: '', category: '', status: '' })
 
 const showModal = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
 const editingId = ref(null)
+const imageList = ref([])
+const uploading = reactive({ image: false, video: false })
+let dragIdx = -1
 
 const form = reactive({
   name: '',
@@ -211,20 +271,25 @@ const form = reactive({
   color: '',
   main_image: '',
   images: '',
+  video: '',
   is_featured: false,
   is_new: false
 })
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
 
+function getImageCount(product) {
+  if (!product.images) return 0
+  try {
+    return JSON.parse(product.images).length
+  } catch { return product.main_image ? 1 : 0 }
+}
+
 const fetchProducts = async () => {
   try {
     const result = await productAPI.list({
-      page: page.value,
-      page_size: pageSize,
-      keyword: filter.keyword,
-      category: filter.category,
-      status: filter.status
+      page: page.value, page_size: pageSize,
+      keyword: filter.keyword, category: filter.category, status: filter.status
     })
     products.value = result.data || []
     total.value = result.total || 0
@@ -234,40 +299,30 @@ const fetchProducts = async () => {
 }
 
 const fetchCategories = async () => {
-  try {
-    categories.value = await categoryAPI.list()
-  } catch (error) {
-    console.error('获取分类失败:', error)
-  }
+  try { categories.value = await categoryAPI.list() }
+  catch (error) { console.error('获取分类失败:', error) }
 }
 
 const getStatusText = (status) => {
-  const map = {
-    available: '在售',
-    sold_out: '售罄',
-    disabled: '下架'
-  }
-  return map[status] || status
+  return { available: '在售', sold_out: '售罄', disabled: '下架' }[status] || status
+}
+
+function parseImages(imagesStr) {
+  if (!imagesStr) return []
+  try { return JSON.parse(imagesStr) }
+  catch { return imagesStr ? [imagesStr] : [] }
 }
 
 const openCreateModal = () => {
   isEdit.value = false
   editingId.value = null
   Object.assign(form, {
-    name: '',
-    category_id: categories.value[0]?.id || null,
-    description: '',
-    price: 0,
-    original_price: 0,
-    stock: 0,
-    material: '',
-    size: '',
-    color: '',
-    main_image: '',
-    images: '',
-    is_featured: false,
-    is_new: false
+    name: '', category_id: categories.value[0]?.id || null,
+    description: '', price: 0, original_price: 0, stock: 0,
+    material: '', size: '', color: '', main_image: '', images: '', video: '',
+    is_featured: false, is_new: false
   })
+  imageList.value = []
   showModal.value = true
 }
 
@@ -275,32 +330,82 @@ const openEditModal = (product) => {
   isEdit.value = true
   editingId.value = product.id
   Object.assign(form, {
-    name: product.name,
-    category_id: product.category_id,
-    description: product.description,
-    price: product.price,
-    original_price: product.original_price,
-    stock: product.stock,
-    material: product.material,
-    size: product.size,
-    color: product.color,
-    main_image: product.main_image,
-    images: product.images,
-    is_featured: product.is_featured,
-    is_new: product.is_new
+    name: product.name, category_id: product.category_id,
+    description: product.description, price: product.price,
+    original_price: product.original_price, stock: product.stock,
+    material: product.material, size: product.size, color: product.color,
+    main_image: product.main_image, images: product.images,
+    video: product.video || '', is_featured: product.is_featured, is_new: product.is_new
   })
+  imageList.value = parseImages(product.images)
+  if (imageList.value.length === 0 && product.main_image) {
+    imageList.value = [product.main_image]
+  }
   showModal.value = true
 }
 
-const closeModal = () => {
-  showModal.value = false
+const closeModal = () => { showModal.value = false }
+
+async function handleMultiImageUpload(e) {
+  const files = Array.from(e.target.files)
+  if (!files.length) return
+  const remaining = 9 - imageList.value.length
+  const toUpload = files.slice(0, remaining)
+
+  uploading.image = true
+  for (const file of toUpload) {
+    if (!file.type.startsWith('image/')) continue
+    if (file.size > 10 * 1024 * 1024) { alert(`${file.name} 超过10MB`); continue }
+    try {
+      const result = await uploadAPI.uploadImage(file)
+      imageList.value.push(result.url)
+    } catch (err) {
+      alert(`上传 ${file.name} 失败: ${err.message}`)
+    }
+  }
+  uploading.image = false
+  e.target.value = ''
+}
+
+function removeImage(idx) {
+  imageList.value.splice(idx, 1)
+}
+
+function dragStart(idx) { dragIdx = idx }
+function dragDrop(idx) {
+  if (dragIdx === idx) return
+  const moved = imageList.value.splice(dragIdx, 1)[0]
+  imageList.value.splice(idx, 0, moved)
+  dragIdx = -1
+}
+
+async function handleVideoUpload(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  if (file.size > 50 * 1024 * 1024) { alert('视频大小不能超过50MB'); return }
+
+  uploading.video = true
+  try {
+    const result = await uploadAPI.uploadFile(file)
+    form.video = result.url
+  } catch (err) {
+    alert('视频上传失败: ' + err.message)
+  } finally {
+    uploading.video = false
+    e.target.value = ''
+  }
+}
+
+function syncImageFields() {
+  form.images = imageList.value.length > 0 ? JSON.stringify(imageList.value) : ''
+  form.main_image = imageList.value[0] || ''
 }
 
 const saveProduct = async () => {
   if (!form.name || !form.category_id || form.price <= 0) {
-    alert('请填写必填项')
-    return
+    alert('请填写必填项'); return
   }
+  syncImageFields()
 
   saving.value = true
   try {
@@ -323,147 +428,82 @@ const toggleStatus = async (product) => {
   try {
     await productAPI.update(product.id, { ...product, status: newStatus })
     fetchProducts()
-  } catch (error) {
-    alert(error.message)
-  }
+  } catch (error) { alert(error.message) }
 }
 
 const confirmDelete = async (product) => {
   if (!confirm(`确定要删除商品「${product.name}」吗？`)) return
-
-  try {
-    await productAPI.delete(product.id)
-    fetchProducts()
-  } catch (error) {
-    alert(error.message)
-  }
-}
-
-const handleImageUpload = async (e) => {
-  const file = e.target.files[0]
-  if (!file) return
-
-  try {
-    const result = await uploadAPI.uploadImage(file)
-    form.main_image = result.url
-  } catch (error) {
-    alert('上传失败: ' + error.message)
-  }
+  try { await productAPI.delete(product.id); fetchProducts() }
+  catch (error) { alert(error.message) }
 }
 
 let searchTimer = null
 const debouncedSearch = () => {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    page.value = 1
-    fetchProducts()
-  }, 300)
+  searchTimer = setTimeout(() => { page.value = 1; fetchProducts() }, 300)
 }
 
-onMounted(() => {
-  fetchCategories()
-  fetchProducts()
-})
+onMounted(() => { fetchCategories(); fetchProducts() })
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.page-title { font-size: 24px; }
+.filter-bar { display: flex; gap: 12px; margin-bottom: 20px; }
+.product-cell { display: flex; align-items: center; }
+.product-info { margin-left: 12px; }
+.product-name { font-weight: 500; }
+.product-material { font-size: 12px; color: var(--text-secondary); }
+.product-media-count { font-size: 11px; color: #999; margin-top: 2px; display: flex; gap: 6px; }
+.has-video { color: var(--primary-color); font-weight: 500; }
+.low-stock { color: var(--error-color); font-weight: 500; }
+.action-btns { display: flex; gap: 8px; }
+.form-row { display: flex; gap: 16px; margin-bottom: 16px; }
+.form-row .form-group { flex: 1; margin-bottom: 0; }
+.form-hint-inline { font-size: 12px; color: #999; font-weight: normal; }
+.form-hint { font-size: 12px; color: var(--primary-color); margin-top: 4px; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.pagination-info { padding: 0 16px; color: var(--text-secondary); }
 
-.page-title {
-  font-size: 24px;
+/* Multi-image upload */
+.upload-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, 100px); gap: 10px;
 }
+.upload-item {
+  position: relative; width: 100px; height: 100px;
+  border-radius: 6px; overflow: hidden; cursor: grab;
+  border: 2px solid transparent; transition: border-color 0.2s;
+}
+.upload-item.is-main { border-color: var(--primary-color); }
+.upload-item:hover { border-color: #ccc; }
+.upload-thumb { width: 100%; height: 100%; object-fit: cover; }
+.upload-remove {
+  position: absolute; top: -1px; right: -1px; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--error-color); color: #fff;
+  border: none; cursor: pointer; font-size: 14px; line-height: 20px;
+  display: flex; align-items: center; justify-content: center;
+}
+.main-badge {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(212, 165, 116, 0.9); color: #fff; font-size: 10px;
+  text-align: center; padding: 1px 0;
+}
+.upload-add {
+  width: 100px; height: 100px; border: 2px dashed #ddd;
+  border-radius: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; cursor: pointer;
+  transition: border-color 0.2s; gap: 4px;
+}
+.upload-add:hover { border-color: var(--primary-color); }
+.upload-add-icon { font-size: 28px; color: #bbb; line-height: 1; }
+.upload-add-text { font-size: 11px; color: #999; }
 
-.filter-bar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
+/* Video upload */
+.video-upload { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.video-preview {
+  position: relative; width: 240px; border-radius: 8px; overflow: hidden;
+  background: #000; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
-
-.product-cell {
-  display: flex;
-  align-items: center;
-}
-
-.product-info {
-  margin-left: 12px;
-}
-
-.product-name {
-  font-weight: 500;
-}
-
-.product-material {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.low-stock {
-  color: var(--error-color);
-  font-weight: 500;
-}
-
-.action-btns {
-  display: flex;
-  gap: 8px;
-}
-
-.form-row {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.form-row .form-group {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-.image-upload {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.image-preview {
-  position: relative;
-  width: 100px;
-  height: 100px;
-}
-
-.preview-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.remove-image {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--error-color);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.pagination-info {
-  padding: 0 16px;
-  color: var(--text-secondary);
-}
+.video-player { width: 100%; max-height: 160px; display: block; }
+.video-preview .upload-remove { top: 4px; right: 4px; }
 </style>

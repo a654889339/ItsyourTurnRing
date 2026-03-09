@@ -125,6 +125,7 @@ func setupRoutes(mux *http.ServeMux) {
 
 	// 上传
 	mux.HandleFunc("/api/v1/upload/image", authMiddleware(handleUploadImage))
+	mux.HandleFunc("/api/v1/upload/file", authMiddleware(handleUploadFile))
 
 	// 静态文件
 	fs := http.FileServer(http.Dir("./uploads"))
@@ -1005,4 +1006,32 @@ func handleQRCodePages(w http.ResponseWriter, r *http.Request) {
 		{"value": cfg.WechatMP.Pages.User, "label": "个人中心"},
 	}
 	jsonResponse(w, pages)
+}
+
+// 通用文件上传（图片+视频）
+func handleUploadFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseMultipartForm(50 << 20); err != nil {
+		jsonError(w, "文件太大，最大50MB", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		jsonError(w, "请选择文件", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	fileURL, fileType, err := uploadService.UploadFile(file, header.Filename, header.Header.Get("Content-Type"))
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	jsonResponse(w, map[string]string{"url": fileURL, "type": fileType})
 }

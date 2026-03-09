@@ -136,6 +136,14 @@ export const uploadAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
+  uploadFile: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/upload/file', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000
+    })
+  },
   uploadBase64: (base64) => api.post('/upload/image', { image: base64 })
 }
 

@@ -22,10 +22,10 @@ func (s *ProductService) CreateProduct(userID int64, req *model.ProductCreateReq
 
 	result, err := db.Exec(`
 		INSERT INTO products (user_id, category_id, name, description, price, original_price,
-			images, main_image, material, size, color, stock, is_featured, is_new, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')`,
+			images, main_image, video, material, size, color, stock, is_featured, is_new, status)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available')`,
 		userID, req.CategoryID, req.Name, req.Description, req.Price, req.OriginalPrice,
-		req.Images, req.MainImage, req.Material, req.Size, req.Color, req.Stock,
+		req.Images, req.MainImage, req.Video, req.Material, req.Size, req.Color, req.Stock,
 		req.IsFeatured, req.IsNew)
 	if err != nil {
 		return nil, err
@@ -54,11 +54,11 @@ func (s *ProductService) UpdateProduct(productID int64, userID int64, req *model
 
 	_, err = db.Exec(`
 		UPDATE products SET category_id = ?, name = ?, description = ?, price = ?,
-			original_price = ?, images = ?, main_image = ?, material = ?, size = ?,
+			original_price = ?, images = ?, main_image = ?, video = ?, material = ?, size = ?,
 			color = ?, stock = ?, is_featured = ?, is_new = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		req.CategoryID, req.Name, req.Description, req.Price, req.OriginalPrice,
-		req.Images, req.MainImage, req.Material, req.Size, req.Color, req.Stock,
+		req.Images, req.MainImage, req.Video, req.Material, req.Size, req.Color, req.Stock,
 		req.IsFeatured, req.IsNew, productID)
 	if err != nil {
 		return nil, err
@@ -97,12 +97,12 @@ func (s *ProductService) GetProductByID(productID int64) (*model.Product, error)
 	db := database.GetDB()
 
 	var product model.Product
-	var images, mainImage, material, size, color sql.NullString
+	var images, mainImage, video, material, size, color sql.NullString
 	var originalPrice sql.NullFloat64
 
 	err := db.QueryRow(`
 		SELECT p.id, p.user_id, p.category_id, c.name as category_name, p.name, p.description,
-			p.price, p.original_price, p.images, p.main_image, p.material, p.size, p.color,
+			p.price, p.original_price, p.images, p.main_image, COALESCE(p.video,''), p.material, p.size, p.color,
 			p.stock, p.sales, p.status, p.is_featured, p.is_new, p.sort_order,
 			p.created_at, p.updated_at
 		FROM products p
@@ -110,7 +110,7 @@ func (s *ProductService) GetProductByID(productID int64) (*model.Product, error)
 		WHERE p.id = ?`, productID).Scan(
 		&product.ID, &product.UserID, &product.CategoryID, &product.CategoryName,
 		&product.Name, &product.Description, &product.Price, &originalPrice,
-		&images, &mainImage, &material, &size, &color,
+		&images, &mainImage, &video, &material, &size, &color,
 		&product.Stock, &product.Sales, &product.Status, &product.IsFeatured,
 		&product.IsNew, &product.SortOrder, &product.CreatedAt, &product.UpdatedAt)
 	if err != nil {
@@ -125,6 +125,9 @@ func (s *ProductService) GetProductByID(productID int64) (*model.Product, error)
 	}
 	if mainImage.Valid {
 		product.MainImage = mainImage.String
+	}
+	if video.Valid {
+		product.Video = video.String
 	}
 	if material.Valid {
 		product.Material = material.String
@@ -195,7 +198,7 @@ func (s *ProductService) ListProducts(query *model.PageQuery, userID int64) (*mo
 	// 查询数据
 	dataSQL := fmt.Sprintf(`
 		SELECT p.id, p.user_id, p.category_id, c.name as category_name, p.name, p.description,
-			p.price, p.original_price, p.images, p.main_image, p.material, p.size, p.color,
+			p.price, p.original_price, p.images, p.main_image, COALESCE(p.video,''), p.material, p.size, p.color,
 			p.stock, p.sales, p.status, p.is_featured, p.is_new, p.sort_order,
 			p.created_at, p.updated_at
 		FROM products p
@@ -212,13 +215,13 @@ func (s *ProductService) ListProducts(query *model.PageQuery, userID int64) (*mo
 	var products []model.Product
 	for rows.Next() {
 		var product model.Product
-		var images, mainImage, material, size, color sql.NullString
+		var images, mainImage, video, material, size, color sql.NullString
 		var originalPrice sql.NullFloat64
 
 		err := rows.Scan(
 			&product.ID, &product.UserID, &product.CategoryID, &product.CategoryName,
 			&product.Name, &product.Description, &product.Price, &originalPrice,
-			&images, &mainImage, &material, &size, &color,
+			&images, &mainImage, &video, &material, &size, &color,
 			&product.Stock, &product.Sales, &product.Status, &product.IsFeatured,
 			&product.IsNew, &product.SortOrder, &product.CreatedAt, &product.UpdatedAt)
 		if err != nil {
@@ -233,6 +236,9 @@ func (s *ProductService) ListProducts(query *model.PageQuery, userID int64) (*mo
 		}
 		if mainImage.Valid {
 			product.MainImage = mainImage.String
+		}
+		if video.Valid {
+			product.Video = video.String
 		}
 		if material.Valid {
 			product.Material = material.String

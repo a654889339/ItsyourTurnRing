@@ -281,8 +281,9 @@ func createTables() error {
 		}
 	}
 
-	// 兼容升级: 为旧的 qr_codes 表添加 scene 列
+	// 兼容升级
 	DB.Exec("ALTER TABLE qr_codes ADD COLUMN scene VARCHAR(30) DEFAULT 'custom'")
+	DB.Exec("ALTER TABLE products ADD COLUMN video VARCHAR(500) DEFAULT ''")
 
 	// 初始化默认分类
 	initDefaultCategories()
