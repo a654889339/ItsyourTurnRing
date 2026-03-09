@@ -14,6 +14,7 @@ description: Deploy ItsyourTurnRing project to Tencent Cloud server. Use when th
 | SSH Key | `F:/ItsyourTurnMy/backend/deploy/test.pem` |
 | Project Path (server) | `/root/ItsyourTurnRing` |
 | GitHub Repo | `https://github.com/a654889339/ItsyourTurnRing.git` |
+| GitHub Proxy (服务器用) | `https://ghfast.top/https://github.com/a654889339/ItsyourTurnRing.git` |
 | Frontend Port | `5101` |
 | Backend Port | `5102` |
 
@@ -38,17 +39,22 @@ Use `;` to join commands (PowerShell `&&` unreliable). Use simple `-m "message"`
 
 ### Step 2: SSH – Git Pull (服务器)
 
-SSH into the server, pull latest code:
+SSH into the server, pull latest code.**注意：服务器的 git remote 已配置为使用 ghfast.top 代理**：
 
 ```bash
 sudo bash -c 'cd /root/ItsyourTurnRing && git pull origin main'
 ```
 
-**GitHub 网络不稳定处理**：服务器在中国大陆，访问 GitHub 可能超时或 TLS 断开。处理策略：
-1. 设置 `block_until_ms: 120000`（2分钟等待）
-2. 如果失败（GnuTLS error / timeout），等待 15 秒后重试
+如果 remote URL 不对，先修正：
+
+```bash
+sudo bash -c 'cd /root/ItsyourTurnRing && git remote set-url origin https://ghfast.top/https://github.com/a654889339/ItsyourTurnRing.git'
+```
+
+**GitHub 网络不稳定处理**：服务器在中国大陆，直接访问 GitHub 不通，必须用 ghfast.top 代理。处理策略：
+1. 设置 `block_until_ms: 90000`
+2. 如果失败，等待 15 秒后重试
 3. 最多重试 5 次
-4. 如果连续失败，尝试先配置 git proxy 或换时间段再试
 
 ### Step 3: SSH – Docker Rebuild (服务器)
 
@@ -83,8 +89,8 @@ curl -s -o /dev/null -w '%{http_code}' http://localhost:5102/health
 | Problem | Solution |
 |---------|----------|
 | SSH timeout | Retry after 10-15s. Check security group allows port 22. |
-| git pull GnuTLS error | GitHub 网络不稳定，等 15s 重试，最多 5 次 |
-| git pull timeout | 同上，增大等待时间 |
+| git pull GnuTLS error | 确认 remote URL 使用 ghfast.top 代理，等 15s 重试 |
+| git pull timeout | 同上，确认代理 URL 正确 |
 | Docker build OOM | `docker system prune -f` then retry |
 | Port conflict | Ring uses 5101/5102, ItsyourTurnMy uses 5001/5002/9090 |
 | Backend crash | `sudo docker logs ring-backend --tail 50` |
