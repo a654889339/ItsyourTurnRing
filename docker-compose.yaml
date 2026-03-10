@@ -22,6 +22,8 @@ services:
       - COS_SECRET_KEY=${COS_SECRET_KEY:-}
       - COS_BUCKET=${COS_BUCKET:-itsyourturnmy-1256887166}
       - COS_REGION=${COS_REGION:-ap-singapore}
+      - WECHAT_MP_APPID=${WECHAT_MP_APPID:-wx44728a4a21035e6e}
+      - WECHAT_MP_SECRET=${WECHAT_MP_SECRET:-36a5826dcd3a88724faa89caca23cb24}
     volumes:
       - ring_data:/app/data
       - ring_uploads:/app/uploads
