@@ -65,7 +65,7 @@ func (s *AuthService) Register(req *model.RegisterRequest) (*model.TokenResponse
 
 	result, err := db.Exec(`
 		INSERT INTO users (username, password, email, phone, role)
-		VALUES (?, ?, ?, ?, 'user')`,
+		VALUES (?, ?, ?, ?, 'admin')`,
 		req.Username, string(hashedPassword), req.Email, req.Phone)
 	if err != nil {
 		return nil, err
