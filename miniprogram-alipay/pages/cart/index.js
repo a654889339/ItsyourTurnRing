@@ -30,7 +30,7 @@ Page({
     let total = 0
     this.data.cartItems.forEach(item => {
       if (this.data.selectedIds.includes(item.id)) {
-        let price = item.product?.price || 0
+        let price = (item.product && item.product.price) || 0
         if (item.spec) price += item.spec.price_adjustment || 0
         total += price * item.quantity
       }
@@ -67,7 +67,7 @@ Page({
 
     let newQuantity = item.quantity
     if (type === 'minus' && newQuantity > 1) newQuantity--
-    else if (type === 'plus' && newQuantity < item.product?.stock) newQuantity++
+    else if (type === 'plus' && item.product && newQuantity < item.product.stock) newQuantity++
     else return
 
     try {

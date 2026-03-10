@@ -37,7 +37,7 @@ Page({
       const selected = (items || []).filter(item => cartIds.includes(item.id))
       let total = 0
       selected.forEach(item => {
-        let price = item.product?.price || 0
+        let price = (item.product && item.product.price) || 0
         if (item.spec) price += item.spec.price_adjustment || 0
         total += price * item.quantity
       })
