@@ -301,6 +301,9 @@ func createTables() error {
 	DB.Exec("ALTER TABLE users ADD COLUMN alipay_userid VARCHAR(100) DEFAULT ''")
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_wechat_openid ON users(wechat_openid) WHERE wechat_openid != ''")
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_alipay_userid ON users(alipay_userid) WHERE alipay_userid != ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN xhs_openid VARCHAR(100) DEFAULT ''")
+	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_xhs_openid ON users(xhs_openid) WHERE xhs_openid != ''")
+	DB.Exec("ALTER TABLE orders ADD COLUMN transaction_id VARCHAR(100) DEFAULT ''")
 
 	// 初始化默认分类
 	initDefaultCategories()

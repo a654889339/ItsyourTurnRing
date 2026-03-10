@@ -26,6 +26,7 @@ var (
 	favoriteService *service.FavoriteService
 	reviewService   *service.ReviewService
 	qrcodeService   *service.QRCodeService
+	payService      *service.PayService
 )
 
 func main() {
@@ -65,6 +66,7 @@ func initServices() {
 	favoriteService = service.NewFavoriteService()
 	reviewService = service.NewReviewService()
 	qrcodeService = service.NewQRCodeService()
+	payService = service.NewPayService()
 }
 
 func setupRoutes(mux *http.ServeMux) {
@@ -77,8 +79,13 @@ func setupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/login", handleLogin)
 	mux.HandleFunc("/api/v1/auth/wechat-login", handleWechatLogin)
 	mux.HandleFunc("/api/v1/auth/alipay-login", handleAlipayLogin)
+	mux.HandleFunc("/api/v1/auth/xhs-login", handleXhsLogin)
 	mux.HandleFunc("/api/v1/auth/me", authMiddleware(handleGetCurrentUser))
 	mux.HandleFunc("/api/v1/auth/update-profile", authMiddleware(handleUpdateProfile))
+
+	// 支付回调 (无需登录)
+	mux.HandleFunc("/api/v1/pay/wechat/notify", handleWechatPayNotify)
+	mux.HandleFunc("/api/v1/pay/alipay/notify", handleAlipayPayNotify)
 
 	// 公开API (无需登录)
 	mux.HandleFunc("/api/v1/public/products", handlePublicProducts)
@@ -134,6 +141,34 @@ func setupRoutes(mux *http.ServeMux) {
 	// 静态文件
 	fs := http.FileServer(http.Dir("./uploads"))
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fs))
+}
+
+// ==================== 支付回调处理器 ====================
+
+func handleWechatPayNotify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	respXML, err := payService.HandleWechatNotify(r)
+	if err != nil {
+		log.Printf("微信支付回调处理失败: %v", err)
+	}
+	w.Header().Set("Content-Type", "application/xml")
+	w.Write([]byte(respXML))
+}
+
+func handleAlipayPayNotify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if err := payService.HandleAlipayNotify(r); err != nil {
+		log.Printf("支付宝支付回调处理失败: %v", err)
+		w.Write([]byte("fail"))
+		return
+	}
+	w.Write([]byte("success"))
 }
 
 // CORS中间件
@@ -297,6 +332,26 @@ func handleAlipayLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := authService.AlipayLogin(req.Code)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonResponse(w, result)
+}
+
+func handleXhsLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		jsonError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" {
+		jsonError(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	result, err := authService.XhsLogin(req.Code)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -684,17 +739,18 @@ func handleOrderByID(w http.ResponseWriter, r *http.Request) {
 				jsonResponse(w, nil)
 				return
 			}
-		case "pay":
+		case "prepay":
 			if r.Method == "POST" {
 				var req struct {
 					PayMethod string `json:"pay_method"`
 				}
 				json.NewDecoder(r.Body).Decode(&req)
-				if err := orderService.PayOrder(orderID, userID, req.PayMethod); err != nil {
+				result, err := payService.Prepay(orderID, userID, req.PayMethod)
+				if err != nil {
 					jsonError(w, err.Error(), http.StatusBadRequest)
 					return
 				}
-				jsonResponse(w, nil)
+				jsonResponse(w, result)
 				return
 			}
 		case "receive":

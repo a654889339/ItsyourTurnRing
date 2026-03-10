@@ -496,6 +496,98 @@ func (s *AuthService) findOrCreateByAlipay(alipayUID string) (*model.User, error
 	return s.GetUserByID(id)
 }
 
+// ==================== 小红书登录 ====================
+
+// XhsLogin 小红书小程序登录
+func (s *AuthService) XhsLogin(code string) (*model.TokenResponse, error) {
+	cfg := config.GetConfig()
+	if cfg.XhsMP.AppID == "" || cfg.XhsMP.AppSecret == "" {
+		return nil, errors.New("小红书小程序未配置")
+	}
+
+	openid, err := s.getXhsOpenID(cfg.XhsMP.AppID, cfg.XhsMP.AppSecret, code)
+	if err != nil {
+		return nil, fmt.Errorf("获取小红书openid失败: %w", err)
+	}
+
+	user, err := s.findOrCreateByXhs(openid)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := s.GenerateToken(user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.TokenResponse{Token: token, User: user}, nil
+}
+
+func (s *AuthService) getXhsOpenID(appID, appSecret, code string) (string, error) {
+	reqURL := fmt.Sprintf(
+		"https://customer-api.xiaohongshu.com/sns/jscode2session?app_id=%s&app_secret=%s&code=%s",
+		appID, appSecret, code)
+
+	resp, err := httpClient.Get(reqURL)
+	if err != nil {
+		return "", fmt.Errorf("请求小红书API失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取小红书响应失败: %w", err)
+	}
+
+	var result struct {
+		OpenID     string `json:"openid"`
+		SessionKey string `json:"session_key"`
+		ErrCode    int    `json:"errcode"`
+		ErrMsg     string `json:"errmsg"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("解析小红书响应失败: %w", err)
+	}
+	if result.ErrCode != 0 {
+		return "", fmt.Errorf("小红书API错误: %d %s", result.ErrCode, result.ErrMsg)
+	}
+	if result.OpenID == "" {
+		return "", errors.New("小红书返回空openid")
+	}
+	return result.OpenID, nil
+}
+
+func (s *AuthService) findOrCreateByXhs(openid string) (*model.User, error) {
+	db := database.GetDB()
+
+	var user model.User
+	var nickname sql.NullString
+	err := db.QueryRow(`
+		SELECT id, username, COALESCE(nickname,'') as nickname, email, phone, avatar, role, created_at, updated_at
+		FROM users WHERE xhs_openid = ?`, openid).Scan(
+		&user.ID, &user.Username, &nickname, &user.Email, &user.Phone,
+		&user.Avatar, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	if err == nil {
+		user.Nickname = nickname.String
+		user.XhsOpenID = openid
+		return &user, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	username := safeUsername("xhs", openid)
+	dummyPwd, _ := bcrypt.GenerateFromPassword([]byte(openid), bcrypt.DefaultCost)
+	result, err := db.Exec(`
+		INSERT INTO users (username, password, nickname, xhs_openid, role)
+		VALUES (?, ?, ?, ?, 'user')`, username, string(dummyPwd), "", openid)
+	if err != nil {
+		return nil, fmt.Errorf("创建小红书用户失败: %w", err)
+	}
+	userID, _ := result.LastInsertId()
+	return s.GetUserByID(userID)
+}
+
 // ==================== 更新用户资料 ====================
 
 // UpdateProfile 更新用户昵称和头像

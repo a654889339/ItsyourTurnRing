@@ -70,7 +70,7 @@ export const orderAPI = {
   updateItemQuantity: (orderId, itemId, quantity) => api.put(`/orders/${orderId}/items/${itemId}`, { quantity }),
   getChangeLogs: (id) => api.get(`/orders/${id}/logs`),
   cancel: (id) => api.post(`/orders/${id}/cancel`),
-  pay: (id, data) => api.post(`/orders/${id}/pay`, data),
+  pay: (id, data) => api.post(`/orders/${id}/prepay`, data),
   receive: (id) => api.post(`/orders/${id}/receive`)
 }
 

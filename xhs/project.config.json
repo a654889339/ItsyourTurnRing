@@ -1,0 +1,11 @@
+{
+  "description": "RingShop 小红书小程序",
+  "appid": "",
+  "projectname": "ItsyourTurnRing-XHS",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true
+  }
+}

@@ -4,10 +4,12 @@ Page({
   data: {
     cartItems: [],
     selectedIds: [],
-    totalPrice: 0
+    totalPrice: 0,
+    isLoggedIn: false
   },
 
   onShow() {
+    this.setData({ isLoggedIn: app.checkLogin() })
     if (app.checkLogin()) {
       this.loadCart()
     }
@@ -34,7 +36,7 @@ Page({
     let total = 0
 
     cartItems.forEach(item => {
-      if (selectedIds.includes(item.id)) {
+      if (selectedIds.indexOf(item.id) >= 0) {
         let price = item.product?.price || 0
         if (item.spec) {
           price += item.spec.price_adjustment || 0
@@ -50,7 +52,7 @@ Page({
     const id = e.currentTarget.dataset.id
     let { selectedIds } = this.data
 
-    if (selectedIds.includes(id)) {
+    if (selectedIds.indexOf(id) >= 0) {
       selectedIds = selectedIds.filter(i => i !== id)
     } else {
       selectedIds.push(id)
@@ -79,7 +81,7 @@ Page({
     let newQuantity = item.quantity
     if (type === 'minus' && newQuantity > 1) {
       newQuantity--
-    } else if (type === 'plus' && newQuantity < item.product?.stock) {
+    } else if (type === 'plus' && newQuantity < (item.product?.stock || 999)) {
       newQuantity++
     } else {
       return
@@ -102,24 +104,23 @@ Page({
   async onDeleteItem(e) {
     const id = e.currentTarget.dataset.id
 
-    wx.showModal({
+    xhs.showModal({
       title: '提示',
       content: '确定要删除这个商品吗？',
-      success: async (res) => {
+      success: (res) => {
         if (res.confirm) {
-          try {
-            await app.request({
-              url: `/cart/${id}`,
-              method: 'DELETE'
-            })
+          app.request({
+            url: `/cart/${id}`,
+            method: 'DELETE'
+          }).then(() => {
             this.setData({
               cartItems: this.data.cartItems.filter(item => item.id !== id),
               selectedIds: this.data.selectedIds.filter(i => i !== id)
             })
             this.calculateTotal()
-          } catch (err) {
+          }).catch(err => {
             console.error('删除失败', err)
-          }
+          })
         }
       }
     })
@@ -129,17 +130,17 @@ Page({
     const { selectedIds, cartItems } = this.data
 
     if (selectedIds.length === 0) {
-      wx.showToast({ title: '请选择商品', icon: 'none' })
+      xhs.showToast({ title: '请选择商品', icon: 'none' })
       return
     }
 
-    // 存储选中的购物车ID
-    wx.setStorageSync('checkoutCartIds', selectedIds)
-    wx.navigateTo({ url: '/pages/checkout/index' })
+    xhs.setStorageSync('checkoutCartIds', selectedIds)
+    xhs.navigateTo({ url: '/pages/order/index?action=create' })
   },
 
   onLogin() {
-    app.wxLogin().then(() => {
+    app.xhsLogin(true).then(() => {
+      this.setData({ isLoggedIn: true })
       this.loadCart()
     }).catch(err => {
       console.error('登录失败', err)

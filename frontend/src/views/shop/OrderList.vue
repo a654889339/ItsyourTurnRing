@@ -131,11 +131,15 @@ const getTotalCount = (order) => {
 }
 
 const payOrder = async (order) => {
-  if (!confirm('确认支付？（模拟支付）')) return
+  if (!confirm('确认支付？')) return
 
   try {
-    await orderAPI.pay(order.id, { pay_method: 'wechat' })
-    alert('支付成功')
+    const result = await orderAPI.pay(order.id, { pay_method: 'wechat' })
+    if (!result.need_pay) {
+      alert('支付成功')
+    } else {
+      alert('已创建支付订单，请在小程序中完成支付')
+    }
     fetchOrders()
   } catch (error) {
     alert(error.message)

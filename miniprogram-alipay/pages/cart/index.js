@@ -103,7 +103,7 @@ Page({
       return
     }
     my.setStorageSync({ key: 'checkoutCartIds', data: this.data.selectedIds })
-    my.navigateTo({ url: '/pages/order/create' })
+    my.navigateTo({ url: '/pages/checkout/index' })
   },
 
   onLogin() {

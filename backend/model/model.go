@@ -17,6 +17,7 @@ type User struct {
 	Role          string         `json:"role"`
 	WechatOpenID  string         `json:"wechat_openid,omitempty"`
 	AlipayUserID  string         `json:"alipay_userid,omitempty"`
+	XhsOpenID     string         `json:"xhs_openid,omitempty"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 }
@@ -122,6 +123,7 @@ type Order struct {
 	ExpressCompany  string      `json:"express_company"`
 	ExpressNo       string      `json:"express_no"`
 	Remark          string      `json:"remark"`
+	TransactionID   string      `json:"transaction_id,omitempty"`
 	OrderSource     string      `json:"order_source"` // web/wechat_mp/alipay_mp
 	CreatedAt       time.Time   `json:"created_at"`
 	UpdatedAt       time.Time   `json:"updated_at"`

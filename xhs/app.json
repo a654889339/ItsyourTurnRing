@@ -1,0 +1,24 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/product/index",
+    "pages/cart/index",
+    "pages/order/index",
+    "pages/user/index"
+  ],
+  "window": {
+    "defaultTitle": "RingShop",
+    "titleBarColor": "#d4a574"
+  },
+  "tabBar": {
+    "textColor": "#999",
+    "selectedColor": "#d4a574",
+    "backgroundColor": "#fff",
+    "items": [
+      { "pagePath": "pages/index/index", "name": "首页", "icon": "images/home.png", "activeIcon": "images/home-active.png" },
+      { "pagePath": "pages/cart/index", "name": "购物车", "icon": "images/cart.png", "activeIcon": "images/cart-active.png" },
+      { "pagePath": "pages/order/index", "name": "订单", "icon": "images/order.png", "activeIcon": "images/order-active.png" },
+      { "pagePath": "pages/user/index", "name": "我的", "icon": "images/user.png", "activeIcon": "images/user-active.png" }
+    ]
+  }
+}

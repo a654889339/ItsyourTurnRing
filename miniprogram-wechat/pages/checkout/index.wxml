@@ -1,0 +1,99 @@
+<view class="page-checkout">
+  <!-- 收货地址 -->
+  <view class="section">
+    <view class="section-title">收货地址</view>
+    <view class="address-list" wx:if="{{addresses.length > 0}}">
+      <view
+        class="address-item {{selectedAddressId === item.id ? 'selected' : ''}}"
+        wx:for="{{addresses}}"
+        wx:key="id"
+        bindtap="onSelectAddress"
+        data-id="{{item.id}}"
+      >
+        <view class="addr-check">
+          <view class="radio {{selectedAddressId === item.id ? 'checked' : ''}}"></view>
+        </view>
+        <view class="addr-info">
+          <view class="addr-contact">
+            <text class="addr-name">{{item.name}}</text>
+            <text class="addr-phone">{{item.phone}}</text>
+          </view>
+          <view class="addr-detail">{{item.province}} {{item.city}} {{item.district}} {{item.detail}}</view>
+        </view>
+      </view>
+    </view>
+    <view class="empty-address" wx:else>
+      <text>暂无收货地址</text>
+    </view>
+    <view class="btn btn-small btn-secondary" bindtap="onShowAddressForm">+ 新增地址</view>
+  </view>
+
+  <!-- 新增地址表单 -->
+  <view class="address-form-mask" wx:if="{{showAddressForm}}" bindtap="onHideAddressForm">
+    <view class="address-form" catchtap>
+      <view class="form-title">新增收货地址</view>
+      <view class="form-row">
+        <text class="form-label">姓名</text>
+        <input class="form-input" placeholder="收件人姓名" value="{{addressForm.name}}" data-field="name" bindinput="onAddressInput" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">电话</text>
+        <input class="form-input" type="number" placeholder="手机号" value="{{addressForm.phone}}" data-field="phone" bindinput="onAddressInput" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">省份</text>
+        <input class="form-input" placeholder="省" value="{{addressForm.province}}" data-field="province" bindinput="onAddressInput" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">城市</text>
+        <input class="form-input" placeholder="市" value="{{addressForm.city}}" data-field="city" bindinput="onAddressInput" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">区县</text>
+        <input class="form-input" placeholder="区/县" value="{{addressForm.district}}" data-field="district" bindinput="onAddressInput" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">详细地址</text>
+        <input class="form-input" placeholder="街道/楼号/门牌号" value="{{addressForm.detail}}" data-field="detail" bindinput="onAddressInput" />
+      </view>
+      <view class="form-actions">
+        <view class="btn btn-small btn-secondary" bindtap="onHideAddressForm">取消</view>
+        <view class="btn btn-small btn-primary" bindtap="onSaveAddress">保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 商品列表 -->
+  <view class="section">
+    <view class="section-title">商品信息</view>
+    <view class="goods-list">
+      <view class="goods-item" wx:for="{{cartItems}}" wx:key="id">
+        <image class="goods-image" src="{{item.product.main_image}}" mode="aspectFill" />
+        <view class="goods-info">
+          <view class="goods-name">{{item.product.name}}</view>
+          <view class="goods-spec" wx:if="{{item.spec}}">{{item.spec.name}}</view>
+          <view class="goods-price-row">
+            <text class="goods-price">¥{{item.product.price}}</text>
+            <text class="goods-qty">×{{item.quantity}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 备注 -->
+  <view class="section">
+    <view class="section-title">订单备注</view>
+    <textarea class="remark-input" placeholder="选填，备注您的特殊需求" value="{{remark}}" bindinput="onRemarkInput" maxlength="200" />
+  </view>
+
+  <!-- 底部提交栏 -->
+  <view class="footer-bar">
+    <view class="footer-total">
+      合计: <text class="total-price">¥{{totalPrice}}</text>
+    </view>
+    <view class="btn btn-primary submit-btn {{submitting ? 'disabled' : ''}}" bindtap="onSubmitOrder">
+      {{submitting ? '提交中...' : '提交订单'}}
+    </view>
+  </view>
+</view>

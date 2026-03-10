@@ -17,6 +17,7 @@ type Config struct {
 	Email          EmailConfig          `yaml:"email"`
 	WechatMP       WechatMPConfig       `yaml:"wechat_miniprogram"`
 	AlipayMP       AlipayMPConfig       `yaml:"alipay_miniprogram"`
+	XhsMP          XhsMPConfig          `yaml:"xhs_miniprogram"`
 	WechatPay      WechatPayConfig      `yaml:"wechat_pay"`
 	AlipayPay      AlipayPayConfig      `yaml:"alipay_pay"`
 	CORS           CORSConfig           `yaml:"cors"`
@@ -113,6 +114,20 @@ type AlipayMPConfig struct {
 }
 
 type AlipayMPPages struct {
+	Home    string `yaml:"home"`
+	Product string `yaml:"product"`
+	Cart    string `yaml:"cart"`
+	Order   string `yaml:"order"`
+	User    string `yaml:"user"`
+}
+
+type XhsMPConfig struct {
+	AppID     string     `yaml:"app_id"`
+	AppSecret string     `yaml:"app_secret"`
+	Pages     XhsMPPages `yaml:"pages"`
+}
+
+type XhsMPPages struct {
 	Home    string `yaml:"home"`
 	Product string `yaml:"product"`
 	Cart    string `yaml:"cart"`
@@ -250,6 +265,31 @@ func applyEnvOverrides(config *Config) {
 	}
 	if appID := os.Getenv("ALIPAY_MP_APPID"); appID != "" {
 		config.AlipayMP.AppID = appID
+	}
+	if appID := os.Getenv("XHS_MP_APPID"); appID != "" {
+		config.XhsMP.AppID = appID
+	}
+	if appSecret := os.Getenv("XHS_MP_SECRET"); appSecret != "" {
+		config.XhsMP.AppSecret = appSecret
+	}
+
+	// 微信支付环境变量覆盖
+	if mchID := os.Getenv("WECHAT_PAY_MCH_ID"); mchID != "" {
+		config.WechatPay.MchID = mchID
+	}
+	if apiKey := os.Getenv("WECHAT_PAY_API_KEY"); apiKey != "" {
+		config.WechatPay.APIKey = apiKey
+	}
+	if config.WechatPay.MchID != "" && config.WechatPay.APIKey != "" {
+		config.WechatPay.Enabled = true
+	}
+
+	// 支付宝支付环境变量覆盖
+	if appID := os.Getenv("ALIPAY_PAY_APPID"); appID != "" {
+		config.AlipayPay.AppID = appID
+	}
+	if config.AlipayPay.AppID != "" {
+		config.AlipayPay.Enabled = true
 	}
 }
 

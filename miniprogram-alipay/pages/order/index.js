@@ -35,16 +35,42 @@ Page({
 
   async onPay(e) {
     const id = e.target.dataset.id
-    my.confirm({
-      content: '确认支付？（模拟支付）',
-      success: async (res) => {
-        if (res.confirm) {
-          await app.request({ url: `/orders/${id}/pay`, method: 'POST', data: { pay_method: 'alipay' } })
-          my.showToast({ content: '支付成功' })
-          this.loadOrders()
-        }
+
+    try {
+      my.showLoading({ content: '发起支付...' })
+      const result = await app.request({
+        url: `/orders/${id}/prepay`,
+        method: 'POST',
+        data: { pay_method: 'alipay' },
+        showLoading: false
+      })
+      my.hideLoading()
+
+      if (!result.need_pay) {
+        my.showToast({ content: '支付成功' })
+        this.loadOrders()
+        return
       }
-    })
+
+      const tradeNO = result.pay_params.tradeNO
+      my.tradePay({
+        tradeNO: tradeNO,
+        success: (res) => {
+          if (res.resultCode === '9000') {
+            my.showToast({ content: '支付成功' })
+            this.loadOrders()
+          } else {
+            my.showToast({ content: '支付取消' })
+          }
+        },
+        fail: () => {
+          my.showToast({ content: '支付取消' })
+        }
+      })
+    } catch (err) {
+      my.hideLoading()
+      console.error('发起支付失败', err)
+    }
   },
 
   async onCancel(e) {

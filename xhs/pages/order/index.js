@@ -4,6 +4,7 @@ Page({
   data: {
     orders: [],
     currentStatus: '',
+    isLoggedIn: false,
     statusTabs: [
       { label: '全部', value: '' },
       { label: '待付款', value: 'pending' },
@@ -14,6 +15,7 @@ Page({
   },
 
   onShow() {
+    this.setData({ isLoggedIn: app.checkLogin() })
     if (app.checkLogin()) {
       this.loadOrders()
     }
@@ -21,7 +23,7 @@ Page({
 
   onPullDownRefresh() {
     this.loadOrders().then(() => {
-      wx.stopPullDownRefresh()
+      xhs.stopPullDownRefresh()
     })
   },
 
@@ -63,92 +65,79 @@ Page({
     return (order.items || []).reduce((sum, item) => sum + item.quantity, 0)
   },
 
-  async onPay(e) {
+  onPay(e) {
     const id = e.currentTarget.dataset.id
 
-    try {
-      wx.showLoading({ title: '发起支付...' })
-      const result = await app.request({
-        url: `/orders/${id}/prepay`,
-        method: 'POST',
-        data: { pay_method: 'wechat' },
-        showLoading: false
-      })
-      wx.hideLoading()
-
-      if (!result.need_pay) {
-        wx.showToast({ title: '支付成功', icon: 'success' })
-        this.loadOrders()
-        return
-      }
-
-      const params = result.pay_params
-      wx.requestPayment({
-        timeStamp: params.timeStamp,
-        nonceStr: params.nonceStr,
-        package: params.package,
-        signType: params.signType,
-        paySign: params.paySign,
-        success: () => {
-          wx.showToast({ title: '支付成功', icon: 'success' })
-          this.loadOrders()
-        },
-        fail: () => {
-          wx.showToast({ title: '支付取消', icon: 'none' })
-        }
-      })
-    } catch (err) {
-      wx.hideLoading()
-      console.error('发起支付失败', err)
-    }
-  },
-
-  async onCancel(e) {
-    const id = e.currentTarget.dataset.id
-
-    wx.showModal({
+    xhs.showModal({
       title: '提示',
-      content: '确定要取消订单吗？',
-      success: async (res) => {
+      content: '确认支付？',
+      success: (res) => {
         if (res.confirm) {
-          try {
-            await app.request({
-              url: `/orders/${id}/cancel`,
-              method: 'POST'
-            })
-            this.loadOrders()
-          } catch (err) {
-            console.error('取消失败', err)
-          }
+          app.request({
+            url: `/orders/${id}/prepay`,
+            method: 'POST',
+            data: { pay_method: 'wechat' }
+          }).then((result) => {
+            if (!result.need_pay) {
+              xhs.showToast({ title: '支付成功', icon: 'success' })
+              this.loadOrders()
+            } else {
+              xhs.showToast({ title: '请在微信或支付宝中完成支付', icon: 'none' })
+              this.loadOrders()
+            }
+          }).catch(err => {
+            console.error('支付失败', err)
+          })
         }
       }
     })
   },
 
-  async onReceive(e) {
+  onCancel(e) {
     const id = e.currentTarget.dataset.id
 
-    wx.showModal({
+    xhs.showModal({
+      title: '提示',
+      content: '确定要取消订单吗？',
+      success: (res) => {
+        if (res.confirm) {
+          app.request({
+            url: `/orders/${id}/cancel`,
+            method: 'POST'
+          }).then(() => {
+            this.loadOrders()
+          }).catch(err => {
+            console.error('取消失败', err)
+          })
+        }
+      }
+    })
+  },
+
+  onReceive(e) {
+    const id = e.currentTarget.dataset.id
+
+    xhs.showModal({
       title: '提示',
       content: '确认已收到商品？',
-      success: async (res) => {
+      success: (res) => {
         if (res.confirm) {
-          try {
-            await app.request({
-              url: `/orders/${id}/receive`,
-              method: 'POST'
-            })
+          app.request({
+            url: `/orders/${id}/receive`,
+            method: 'POST'
+          }).then(() => {
             this.loadOrders()
-          } catch (err) {
+          }).catch(err => {
             console.error('确认收货失败', err)
-          }
+          })
         }
       }
     })
   },
 
   onLogin() {
-    app.wxLogin().then(() => {
+    app.xhsLogin(true).then(() => {
+      this.setData({ isLoggedIn: true })
       this.loadOrders()
     })
   }

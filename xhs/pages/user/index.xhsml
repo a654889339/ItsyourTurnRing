@@ -1,0 +1,53 @@
+<view class="page-user">
+  <view class="user-header">
+    <view class="user-info" xhs:if="{{isLogin}}">
+      <view class="avatar-btn" bindtap="onChooseAvatar">
+        <image xhs:if="{{avatarUrl}}" src="{{avatarUrl}}" class="user-avatar-img" mode="aspectFill" />
+        <view xhs:else class="user-avatar">
+          <text>{{userInitial}}</text>
+        </view>
+      </view>
+      <view class="user-detail">
+        <view class="nickname-row">
+          <input
+            type="text"
+            class="nickname-input"
+            value="{{nickname}}"
+            placeholder="点击设置昵称"
+            bindblur="onNicknameBlur"
+            bindinput="onNicknameInput"
+          />
+        </view>
+        <view class="user-id" xhs:if="{{userInfo}}">ID: {{userInfo.id}}</view>
+      </view>
+    </view>
+    <view class="not-login" xhs:else bindtap="onLogin">
+      <view class="user-avatar">?</view>
+      <view class="login-text">点击登录</view>
+    </view>
+  </view>
+
+  <view class="menu-list">
+    <navigator url="/pages/order/index" class="menu-item" open-type="switchTab">
+      <text class="menu-icon">📦</text>
+      <text class="menu-text">我的订单</text>
+      <text class="menu-arrow">›</text>
+    </navigator>
+
+    <view class="menu-item" bindtap="onContact">
+      <text class="menu-icon">📞</text>
+      <text class="menu-text">联系客服</text>
+      <text class="menu-arrow">›</text>
+    </view>
+
+    <view class="menu-item">
+      <text class="menu-icon">ℹ️</text>
+      <text class="menu-text">关于我们</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <view class="logout-section" xhs:if="{{isLogin}}">
+    <view class="btn btn-secondary" bindtap="onLogout">退出登录</view>
+  </view>
+</view>
