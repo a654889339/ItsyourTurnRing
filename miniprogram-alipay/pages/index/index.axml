@@ -54,6 +54,7 @@
         <image src="{{item.main_image}}" mode="aspectFill" class="scroll-item-image" />
         <view class="scroll-item-name">{{item.name}}</view>
         <view class="scroll-item-price">¥{{item.price}}</view>
+        <view class="scroll-item-sales" a:if="{{item.sales > 0}}">已售{{item.sales}}件</view>
       </view>
     </scroll-view>
   </view>
@@ -73,6 +74,7 @@
         <image src="{{item.main_image}}" mode="aspectFill" class="scroll-item-image" />
         <view class="scroll-item-name">{{item.name}}</view>
         <view class="scroll-item-price">¥{{item.price}}</view>
+        <view class="scroll-item-sales" a:if="{{item.sales > 0}}">已售{{item.sales}}件</view>
       </view>
     </scroll-view>
   </view>
@@ -95,6 +97,7 @@
           <view class="product-price">
             <text class="price">¥{{item.price}}</text>
             <text class="price-original" a:if="{{item.original_price}}">¥{{item.original_price}}</text>
+            <text class="product-sales" a:if="{{item.sales > 0}}">已售{{item.sales}}件</text>
           </view>
         </view>
       </view>

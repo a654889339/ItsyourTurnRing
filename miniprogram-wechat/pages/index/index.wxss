@@ -186,4 +186,17 @@
 .product-price {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.scroll-item-sales {
+  padding: 0 16rpx 12rpx;
+  font-size: 20rpx;
+  color: #999;
+}
+
+.product-sales {
+  font-size: 20rpx;
+  color: #999;
+  margin-left: auto;
 }
