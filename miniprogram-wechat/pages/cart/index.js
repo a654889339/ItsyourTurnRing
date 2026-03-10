@@ -2,13 +2,16 @@ const app = getApp()
 
 Page({
   data: {
+    isLogin: false,
     cartItems: [],
     selectedIds: [],
     totalPrice: 0
   },
 
   onShow() {
-    if (app.checkLogin()) {
+    const isLogin = app.checkLogin()
+    this.setData({ isLogin })
+    if (isLogin) {
       this.loadCart()
     }
   },
@@ -139,7 +142,8 @@ Page({
   },
 
   onLogin() {
-    app.wxLogin().then(() => {
+    app.wxLogin(true).then(() => {
+      this.setData({ isLogin: true })
       this.loadCart()
     }).catch(err => {
       console.error('登录失败', err)

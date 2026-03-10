@@ -1,7 +1,7 @@
 <!-- 订单列表页 -->
 <view class="page-order">
   <!-- 未登录 -->
-  <view class="not-login" wx:if="{{!app.globalData.token}}">
+  <view class="not-login" wx:if="{{!isLogin}}">
     <view class="empty-icon">📦</view>
     <text>登录后查看订单</text>
     <view class="btn btn-primary" bindtap="onLogin">微信登录</view>

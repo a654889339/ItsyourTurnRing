@@ -1,7 +1,7 @@
 <!-- 购物车页 -->
 <view class="page-cart">
   <!-- 未登录 -->
-  <view class="not-login" wx:if="{{!app.globalData.token}}">
+  <view class="not-login" wx:if="{{!isLogin}}">
     <view class="empty-icon">🛒</view>
     <text>登录后查看购物车</text>
     <view class="btn btn-primary" bindtap="onLogin">微信登录</view>

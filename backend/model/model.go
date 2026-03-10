@@ -1,7 +1,6 @@
 package model
 
 import (
-	"database/sql"
 	"time"
 )
 
@@ -11,9 +10,9 @@ type User struct {
 	Username      string         `json:"username"`
 	Password      string         `json:"-"`
 	Nickname      string         `json:"nickname"`
-	Email         sql.NullString `json:"email"`
-	Phone         sql.NullString `json:"phone"`
-	Avatar        sql.NullString `json:"avatar"`
+	Email         string         `json:"email"`
+	Phone         string         `json:"phone"`
+	Avatar        string         `json:"avatar"`
 	Role          string         `json:"role"`
 	WechatOpenID  string         `json:"wechat_openid,omitempty"`
 	AlipayUserID  string         `json:"alipay_userid,omitempty"`

@@ -95,11 +95,10 @@ func (s *AuthService) Login(req *model.LoginRequest) (*model.TokenResponse, erro
 
 	var user model.User
 	var password string
-	var nickname sql.NullString
 	err := db.QueryRow(`
-		SELECT id, username, password, COALESCE(nickname,'') as nickname, email, phone, avatar, role, created_at, updated_at
+		SELECT id, username, password, COALESCE(nickname,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(avatar,''), role, created_at, updated_at
 		FROM users WHERE username = ?`, req.Username).Scan(
-		&user.ID, &user.Username, &password, &nickname, &user.Email, &user.Phone,
+		&user.ID, &user.Username, &password, &user.Nickname, &user.Email, &user.Phone,
 		&user.Avatar, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -107,7 +106,6 @@ func (s *AuthService) Login(req *model.LoginRequest) (*model.TokenResponse, erro
 		}
 		return nil, err
 	}
-	user.Nickname = nickname.String
 
 	if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(req.Password)); err != nil {
 		return nil, errors.New("密码错误")
@@ -129,16 +127,14 @@ func (s *AuthService) GetUserByID(id int64) (*model.User, error) {
 	db := database.GetDB()
 
 	var user model.User
-	var nickname sql.NullString
 	err := db.QueryRow(`
-		SELECT id, username, COALESCE(nickname,'') as nickname, email, phone, avatar, role, created_at, updated_at
+		SELECT id, username, COALESCE(nickname,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(avatar,''), role, created_at, updated_at
 		FROM users WHERE id = ?`, id).Scan(
-		&user.ID, &user.Username, &nickname, &user.Email, &user.Phone,
+		&user.ID, &user.Username, &user.Nickname, &user.Email, &user.Phone,
 		&user.Avatar, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
-	user.Nickname = nickname.String
 
 	return &user, nil
 }
@@ -275,14 +271,12 @@ func (s *AuthService) findOrCreateByWechat(openid string) (*model.User, error) {
 	db := database.GetDB()
 
 	var user model.User
-	var nickname sql.NullString
 	err := db.QueryRow(`
-		SELECT id, username, COALESCE(nickname,'') as nickname, email, phone, avatar, role, created_at, updated_at
+		SELECT id, username, COALESCE(nickname,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(avatar,''), role, created_at, updated_at
 		FROM users WHERE wechat_openid = ?`, openid).Scan(
-		&user.ID, &user.Username, &nickname, &user.Email, &user.Phone,
+		&user.ID, &user.Username, &user.Nickname, &user.Email, &user.Phone,
 		&user.Avatar, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err == nil {
-		user.Nickname = nickname.String
 		user.WechatOpenID = openid
 		return &user, nil
 	}
@@ -469,14 +463,12 @@ func (s *AuthService) findOrCreateByAlipay(alipayUID string) (*model.User, error
 	db := database.GetDB()
 
 	var user model.User
-	var nick sql.NullString
 	err := db.QueryRow(`
-		SELECT id, username, COALESCE(nickname,'') as nickname, email, phone, avatar, role, created_at, updated_at
+		SELECT id, username, COALESCE(nickname,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(avatar,''), role, created_at, updated_at
 		FROM users WHERE alipay_userid = ?`, alipayUID).Scan(
-		&user.ID, &user.Username, &nick, &user.Email, &user.Phone,
+		&user.ID, &user.Username, &user.Nickname, &user.Email, &user.Phone,
 		&user.Avatar, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err == nil {
-		user.Nickname = nick.String
 		user.AlipayUserID = alipayUID
 		return &user, nil
 	}
@@ -561,14 +553,12 @@ func (s *AuthService) findOrCreateByXhs(openid string) (*model.User, error) {
 	db := database.GetDB()
 
 	var user model.User
-	var nickname sql.NullString
 	err := db.QueryRow(`
-		SELECT id, username, COALESCE(nickname,'') as nickname, email, phone, avatar, role, created_at, updated_at
+		SELECT id, username, COALESCE(nickname,''), COALESCE(email,''), COALESCE(phone,''), COALESCE(avatar,''), role, created_at, updated_at
 		FROM users WHERE xhs_openid = ?`, openid).Scan(
-		&user.ID, &user.Username, &nickname, &user.Email, &user.Phone,
+		&user.ID, &user.Username, &user.Nickname, &user.Email, &user.Phone,
 		&user.Avatar, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err == nil {
-		user.Nickname = nickname.String
 		user.XhsOpenID = openid
 		return &user, nil
 	}
