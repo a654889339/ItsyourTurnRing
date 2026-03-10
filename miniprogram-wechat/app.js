@@ -1,6 +1,6 @@
 App({
   globalData: {
-    apiBase: 'https://ring-api.itsyourturn.top/api/v1',
+    apiBase: 'http://106.54.50.88:5102/api/v1',
     token: null,
     userInfo: null
   },
