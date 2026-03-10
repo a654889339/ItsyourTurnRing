@@ -41,16 +41,12 @@
         <input class="form-input" type="number" placeholder="手机号" value="{{addressForm.phone}}" data-field="phone" onInput="onAddressInput" />
       </view>
       <view class="form-row">
-        <text class="form-label">省份</text>
-        <input class="form-input" placeholder="省" value="{{addressForm.province}}" data-field="province" onInput="onAddressInput" />
-      </view>
-      <view class="form-row">
-        <text class="form-label">城市</text>
-        <input class="form-input" placeholder="市" value="{{addressForm.city}}" data-field="city" onInput="onAddressInput" />
-      </view>
-      <view class="form-row">
-        <text class="form-label">区县</text>
-        <input class="form-input" placeholder="区/县" value="{{addressForm.district}}" data-field="district" onInput="onAddressInput" />
+        <text class="form-label">地区</text>
+        <picker mode="multiSelector" range="{{regionRange}}" value="{{regionIndex}}" onChange="onRegionChange" onColumnChange="onRegionColumnChange">
+          <view class="form-input picker-text {{addressForm.province ? '' : 'placeholder'}}">
+            {{addressForm.province ? addressForm.province + ' ' + addressForm.city + ' ' + addressForm.district : '请选择省/市/区'}}
+          </view>
+        </picker>
       </view>
       <view class="form-row">
         <text class="form-label">详细地址</text>

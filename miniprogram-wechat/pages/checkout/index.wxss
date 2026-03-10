@@ -130,6 +130,15 @@
   flex: 1;
   font-size: 28rpx;
   height: 60rpx;
+  line-height: 60rpx;
+}
+
+.picker-text {
+  color: #333;
+}
+
+.picker-text.placeholder {
+  color: #999;
 }
 
 .form-actions {

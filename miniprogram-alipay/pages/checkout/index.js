@@ -1,4 +1,17 @@
 const app = getApp()
+const regions = require('../../utils/regions')
+
+const provinceList = Object.keys(regions)
+
+function getCities(province) {
+  if (!province || !regions[province]) return []
+  return Object.keys(regions[province])
+}
+
+function getDistricts(province, city) {
+  if (!province || !regions[province] || !regions[province][city]) return []
+  return regions[province][city]
+}
 
 Page({
   data: {
@@ -9,6 +22,8 @@ Page({
     totalPrice: 0,
     submitting: false,
     showAddressForm: false,
+    regionRange: [[], [], []],
+    regionIndex: [0, 0, 0],
     addressForm: {
       name: '',
       phone: '',
@@ -20,8 +35,18 @@ Page({
   },
 
   onLoad() {
+    this.initRegionPicker()
     this.loadCartItems()
     this.loadAddresses()
+  },
+
+  initRegionPicker() {
+    var cities = getCities(provinceList[0])
+    var districts = getDistricts(provinceList[0], cities[0])
+    this.setData({
+      regionRange: [provinceList, cities, districts],
+      regionIndex: [0, 0, 0]
+    })
   },
 
   async loadCartItems() {
@@ -83,6 +108,51 @@ Page({
     this.setData({ [`addressForm.${field}`]: e.detail.value })
   },
 
+  onRegionColumnChange(e) {
+    var col = e.detail.column
+    var val = e.detail.value
+    var idx = this.data.regionIndex.slice()
+    idx[col] = val
+
+    if (col === 0) {
+      var cities = getCities(provinceList[val])
+      var districts = getDistricts(provinceList[val], cities[0])
+      idx[1] = 0
+      idx[2] = 0
+      this.setData({
+        regionIndex: idx,
+        'regionRange[1]': cities,
+        'regionRange[2]': districts
+      })
+    } else if (col === 1) {
+      var province = provinceList[idx[0]]
+      var cities2 = getCities(province)
+      var districts2 = getDistricts(province, cities2[val])
+      idx[2] = 0
+      this.setData({
+        regionIndex: idx,
+        'regionRange[2]': districts2
+      })
+    } else {
+      this.setData({ regionIndex: idx })
+    }
+  },
+
+  onRegionChange(e) {
+    var vals = e.detail.value
+    var province = provinceList[vals[0]]
+    var cities = getCities(province)
+    var city = cities[vals[1]] || ''
+    var districts = getDistricts(province, city)
+    var district = districts[vals[2]] || ''
+    this.setData({
+      regionIndex: vals,
+      'addressForm.province': province,
+      'addressForm.city': city,
+      'addressForm.district': district
+    })
+  },
+
   async onSaveAddress() {
     const f = this.data.addressForm
     if (!f.name || !f.phone || !f.province || !f.city || !f.detail) {
@@ -99,6 +169,7 @@ Page({
       if (addr && addr.id) {
         this.setData({ selectedAddressId: addr.id })
       }
+      this.initRegionPicker()
       this.setData({
         showAddressForm: false,
         addressForm: { name: '', phone: '', province: '', city: '', district: '', detail: '' }

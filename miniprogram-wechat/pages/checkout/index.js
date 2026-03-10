@@ -9,6 +9,7 @@ Page({
     totalPrice: 0,
     submitting: false,
     showAddressForm: false,
+    regionValue: [],
     addressForm: {
       name: '',
       phone: '',
@@ -83,6 +84,16 @@ Page({
     this.setData({ [`addressForm.${field}`]: e.detail.value })
   },
 
+  onRegionChange(e) {
+    const [province, city, district] = e.detail.value
+    this.setData({
+      'addressForm.province': province,
+      'addressForm.city': city,
+      'addressForm.district': district,
+      regionValue: e.detail.value
+    })
+  },
+
   async onSaveAddress() {
     const f = this.data.addressForm
     if (!f.name || !f.phone || !f.province || !f.city || !f.detail) {
@@ -101,6 +112,7 @@ Page({
       }
       this.setData({
         showAddressForm: false,
+        regionValue: [],
         addressForm: { name: '', phone: '', province: '', city: '', district: '', detail: '' }
       })
       wx.showToast({ title: '地址已保存', icon: 'success' })
