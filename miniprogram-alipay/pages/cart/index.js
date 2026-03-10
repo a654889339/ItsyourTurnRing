@@ -16,10 +16,11 @@ Page({
 
   async loadCart() {
     try {
-      const items = await app.request({ url: '/cart', showLoading: false })
+      var items = await app.request({ url: '/cart', showLoading: false })
+      var list = items || []
       this.setData({
-        cartItems: items || [],
-        selectedIds: (items || []).map(item => item.id)
+        cartItems: list,
+        selectedIds: list.map(function(item) { return Number(item.id) })
       })
       this.updateSelectedMap()
       this.calculateTotal()
@@ -35,44 +36,50 @@ Page({
   },
 
   calculateTotal() {
-    let total = 0
-    this.data.cartItems.forEach(item => {
-      if (this.data.selectedIds.includes(item.id)) {
-        let price = (item.product && item.product.price) || 0
-        if (item.spec) price += item.spec.price_adjustment || 0
+    var total = 0
+    var selectedMap = this.data.selectedMap
+    this.data.cartItems.forEach(function(item) {
+      if (selectedMap[item.id]) {
+        var price = (item.product && item.product.price) ? Number(item.product.price) : 0
+        if (item.spec && item.spec.price_adjustment) {
+          price += Number(item.spec.price_adjustment)
+        }
         total += price * item.quantity
       }
     })
-    this.setData({ totalPrice: total })
+    this.setData({ totalPrice: total.toFixed(2) })
   },
 
   onSelectItem(e) {
-    const id = e.target.dataset.id
-    let { selectedIds } = this.data
-    if (selectedIds.includes(id)) {
-      selectedIds = selectedIds.filter(i => i !== id)
+    var id = Number(e.target.dataset.id)
+    var selectedIds = this.data.selectedIds.slice()
+    var idx = selectedIds.indexOf(id)
+    if (idx > -1) {
+      selectedIds.splice(idx, 1)
     } else {
       selectedIds.push(id)
     }
-    this.setData({ selectedIds })
+    this.setData({ selectedIds: selectedIds })
     this.updateSelectedMap()
     this.calculateTotal()
   },
 
   onSelectAll() {
-    const { cartItems, selectedIds } = this.data
+    var cartItems = this.data.cartItems
+    var selectedIds = this.data.selectedIds
     if (selectedIds.length === cartItems.length) {
       this.setData({ selectedIds: [] })
     } else {
-      this.setData({ selectedIds: cartItems.map(item => item.id) })
+      this.setData({ selectedIds: cartItems.map(function(item) { return Number(item.id) }) })
     }
     this.updateSelectedMap()
     this.calculateTotal()
   },
 
   async onQuantityChange(e) {
-    const { id, type } = e.target.dataset
-    const item = this.data.cartItems.find(i => i.id === id)
+    var type = e.target.dataset.type
+    var id = Number(e.target.dataset.id)
+    var item = this.data.cartItems.find(function(i) { return i.id === id })
     if (!item) return
 
     let newQuantity = item.quantity
@@ -91,7 +98,7 @@ Page({
   },
 
   async onDeleteItem(e) {
-    const id = e.target.dataset.id
+    var id = Number(e.target.dataset.id)
     my.confirm({
       content: '确定要删除这个商品吗？',
       success: async (res) => {

@@ -23,9 +23,10 @@ Page({
         url: '/cart',
         showLoading: false
       })
+      const list = items || []
       this.setData({
-        cartItems: items || [],
-        selectedIds: (items || []).map(item => item.id)
+        cartItems: list,
+        selectedIds: list.map(item => Number(item.id))
       })
       this.updateSelectedMap()
       this.calculateTotal()
@@ -41,28 +42,29 @@ Page({
   },
 
   calculateTotal() {
-    const { cartItems, selectedIds } = this.data
+    const { cartItems, selectedMap } = this.data
     let total = 0
 
     cartItems.forEach(item => {
-      if (selectedIds.includes(item.id)) {
-        let price = item.product?.price || 0
-        if (item.spec) {
-          price += item.spec.price_adjustment || 0
+      if (selectedMap[item.id]) {
+        let price = (item.product && item.product.price) ? Number(item.product.price) : 0
+        if (item.spec && item.spec.price_adjustment) {
+          price += Number(item.spec.price_adjustment)
         }
         total += price * item.quantity
       }
     })
 
-    this.setData({ totalPrice: total })
+    this.setData({ totalPrice: total.toFixed(2) })
   },
 
   onSelectItem(e) {
-    const id = e.currentTarget.dataset.id
-    let { selectedIds } = this.data
+    const id = Number(e.currentTarget.dataset.id)
+    let selectedIds = this.data.selectedIds.slice()
 
-    if (selectedIds.includes(id)) {
-      selectedIds = selectedIds.filter(i => i !== id)
+    const idx = selectedIds.indexOf(id)
+    if (idx > -1) {
+      selectedIds.splice(idx, 1)
     } else {
       selectedIds.push(id)
     }
@@ -78,21 +80,22 @@ Page({
     if (selectedIds.length === cartItems.length) {
       this.setData({ selectedIds: [] })
     } else {
-      this.setData({ selectedIds: cartItems.map(item => item.id) })
+      this.setData({ selectedIds: cartItems.map(item => Number(item.id)) })
     }
     this.updateSelectedMap()
     this.calculateTotal()
   },
 
   async onQuantityChange(e) {
-    const { id, type } = e.currentTarget.dataset
+    const { type } = e.currentTarget.dataset
+    const id = Number(e.currentTarget.dataset.id)
     const item = this.data.cartItems.find(i => i.id === id)
     if (!item) return
 
     let newQuantity = item.quantity
     if (type === 'minus' && newQuantity > 1) {
       newQuantity--
-    } else if (type === 'plus' && newQuantity < item.product?.stock) {
+    } else if (type === 'plus' && item.product && newQuantity < item.product.stock) {
       newQuantity++
     } else {
       return
@@ -113,7 +116,7 @@ Page({
   },
 
   async onDeleteItem(e) {
-    const id = e.currentTarget.dataset.id
+    const id = Number(e.currentTarget.dataset.id)
 
     wx.showModal({
       title: '提示',
