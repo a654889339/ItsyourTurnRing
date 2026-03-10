@@ -203,9 +203,12 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// 将用户ID放入请求上下文
+		// 将用户ID和角色放入请求上下文
 		userID := int64((*claims)["user_id"].(float64))
 		r.Header.Set("X-User-ID", strconv.FormatInt(userID, 10))
+		if role, ok := (*claims)["role"].(string); ok {
+			r.Header.Set("X-User-Role", role)
+		}
 
 		next(w, r)
 	}
@@ -214,6 +217,10 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func getUserID(r *http.Request) int64 {
 	userID, _ := strconv.ParseInt(r.Header.Get("X-User-ID"), 10, 64)
 	return userID
+}
+
+func getUserRole(r *http.Request) string {
+	return r.Header.Get("X-User-Role")
 }
 
 // JSON响应辅助函数
@@ -697,7 +704,13 @@ func handleOrders(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		query := parsePageQuery(r)
-		result, err := orderService.ListOrders(query, userID)
+		var result *model.PageResult
+		var err error
+		if getUserRole(r) == "admin" {
+			result, err = orderService.AdminListOrders(query, userID)
+		} else {
+			result, err = orderService.ListOrders(query, userID)
+		}
 		if err != nil {
 			jsonError(w, err.Error(), http.StatusInternalServerError)
 			return
