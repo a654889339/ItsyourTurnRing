@@ -5,6 +5,7 @@ Page({
     isLogin: false,
     cartItems: [],
     selectedIds: [],
+    selectedMap: {},
     totalPrice: 0
   },
 
@@ -26,10 +27,17 @@ Page({
         cartItems: items || [],
         selectedIds: (items || []).map(item => item.id)
       })
+      this.updateSelectedMap()
       this.calculateTotal()
     } catch (err) {
       console.error('加载购物车失败', err)
     }
+  },
+
+  updateSelectedMap() {
+    const map = {}
+    this.data.selectedIds.forEach(id => { map[id] = true })
+    this.setData({ selectedMap: map })
   },
 
   calculateTotal() {
@@ -60,6 +68,7 @@ Page({
     }
 
     this.setData({ selectedIds })
+    this.updateSelectedMap()
     this.calculateTotal()
   },
 
@@ -71,6 +80,7 @@ Page({
     } else {
       this.setData({ selectedIds: cartItems.map(item => item.id) })
     }
+    this.updateSelectedMap()
     this.calculateTotal()
   },
 
@@ -119,6 +129,7 @@ Page({
               cartItems: this.data.cartItems.filter(item => item.id !== id),
               selectedIds: this.data.selectedIds.filter(i => i !== id)
             })
+            this.updateSelectedMap()
             this.calculateTotal()
           } catch (err) {
             console.error('删除失败', err)

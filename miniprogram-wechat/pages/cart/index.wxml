@@ -12,7 +12,7 @@
     <view class="cart-list">
       <view class="cart-item" wx:for="{{cartItems}}" wx:key="id">
         <view
-          class="item-checkbox {{selectedIds.includes(item.id) ? 'checked' : ''}}"
+          class="item-checkbox {{selectedMap[item.id] ? 'checked' : ''}}"
           bindtap="onSelectItem"
           data-id="{{item.id}}"
         >✓</view>

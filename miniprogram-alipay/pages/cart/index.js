@@ -4,6 +4,7 @@ Page({
   data: {
     cartItems: [],
     selectedIds: [],
+    selectedMap: {},
     totalPrice: 0
   },
 
@@ -20,10 +21,17 @@ Page({
         cartItems: items || [],
         selectedIds: (items || []).map(item => item.id)
       })
+      this.updateSelectedMap()
       this.calculateTotal()
     } catch (err) {
       console.error(err)
     }
+  },
+
+  updateSelectedMap() {
+    var map = {}
+    this.data.selectedIds.forEach(function(id) { map[id] = true })
+    this.setData({ selectedMap: map })
   },
 
   calculateTotal() {
@@ -47,6 +55,7 @@ Page({
       selectedIds.push(id)
     }
     this.setData({ selectedIds })
+    this.updateSelectedMap()
     this.calculateTotal()
   },
 
@@ -57,6 +66,7 @@ Page({
     } else {
       this.setData({ selectedIds: cartItems.map(item => item.id) })
     }
+    this.updateSelectedMap()
     this.calculateTotal()
   },
 
@@ -91,6 +101,7 @@ Page({
             cartItems: this.data.cartItems.filter(item => item.id !== id),
             selectedIds: this.data.selectedIds.filter(i => i !== id)
           })
+          this.updateSelectedMap()
           this.calculateTotal()
         }
       }

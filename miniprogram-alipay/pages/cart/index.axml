@@ -8,7 +8,7 @@
   <view a:elif="{{cartItems.length > 0}}">
     <view class="cart-list">
       <view class="cart-item" a:for="{{cartItems}}" a:key="id">
-        <view class="item-checkbox {{selectedIds.includes(item.id) ? 'checked' : ''}}" onTap="onSelectItem" data-id="{{item.id}}">✓</view>
+        <view class="item-checkbox {{selectedMap[item.id] ? 'checked' : ''}}" onTap="onSelectItem" data-id="{{item.id}}">✓</view>
         <image src="{{item.product.main_image}}" mode="aspectFill" class="item-image" />
         <view class="item-info">
           <view class="item-name">{{item.product.name}}</view>
