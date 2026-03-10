@@ -29,8 +29,8 @@
   </view>
 
   <!-- 新增地址表单 -->
-  <view class="address-form-mask" wx:if="{{showAddressForm}}" bindtap="onHideAddressForm">
-    <view class="address-form" catchtap>
+  <view class="address-form-mask {{showAddressForm ? 'show' : ''}}" bindtap="onHideAddressForm">
+    <view class="address-form" catchtap="preventClose">
       <view class="form-title">新增收货地址</view>
       <view class="form-row">
         <text class="form-label">姓名</text>

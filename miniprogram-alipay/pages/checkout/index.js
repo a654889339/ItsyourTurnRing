@@ -103,6 +103,8 @@ Page({
     this.setData({ showAddressForm: false })
   },
 
+  preventClose() {},
+
   onAddressInput(e) {
     const field = e.target.dataset.field
     this.setData({ [`addressForm.${field}`]: e.detail.value })

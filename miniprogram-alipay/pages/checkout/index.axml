@@ -29,8 +29,8 @@
   </view>
 
   <!-- 新增地址表单 -->
-  <view class="address-form-mask" a:if="{{showAddressForm}}" onTap="onHideAddressForm">
-    <view class="address-form" catchTap>
+  <view class="address-form-mask {{showAddressForm ? 'show' : ''}}" onTap="onHideAddressForm">
+    <view class="address-form" catchTap="preventClose">
       <view class="form-title">新增收货地址</view>
       <view class="form-row">
         <text class="form-label">姓名</text>
